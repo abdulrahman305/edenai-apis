@@ -1,0 +1,43 @@
+{
+  "id": "chat-9014af30a40d4d409736f4b6d48e9351",
+  "object": "chat.completion",
+  "created": 1745971102,
+  "model": "tenstorrent/Meta-Llama-3.3-70B-Instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Yer lookin' fer a description o' a scenic boardwalk by a lake in Wisconsin, eh? Alright then, matey! Let me paint ye a picture o' this here scene.\n\nI be gazin' upon a tranquil lake, its waters as calm as a chest overflowin' with gold doubloons. The sun be shinin' bright, castin' a golden Robots glow upon the surroundings. To me left, I see a boardwalk stretchin' along the lake's edge, lined with wooden planks and railings as sturdy as me trusty cutlass.\n\nThe boardwalk be populated with landlubbers, strollin' and takin' in the sights o' the lake. Some be sittin' on benches, gazin' out at the water, while others be walkin' hand in hand, enjoyin' the romantic atmosphere. There be a few swashbucklers, too, with hyperlink their lines cast into the lake, hopin' to catch a big ol' fish fer dinner.\n\nTo me right, I see a forest o' tall trees, their leaves rustlin' in the gentle breeze like a treasure chest filled with golden coins. The trees be reflected in the lake's surface, creatin' a sense o' symmetry and balance, like a well-designed pirate ship.\n\nIn the distance, I see a few sailboats and kayaks, their sails and paddles glintin' in the sunlight as they glide across the lake. It be a peaceful scene, matey, like a calm sea on a sunny day. Ah, Wisconsin be a grand place, don't ye agree, matey?",
+        "name": null,
+        "function_call": null,
+        "tool_calls": []
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0,
+      "prompt_tokens": 340,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0,
+      "prompt_tokens": 66,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "total_tokens": 406
+  },
+  "system_fingerprint": null
+}

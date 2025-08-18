@@ -1,0 +1,21 @@
+{
+  "original_response": {
+    "status": "success",
+    "request": {
+      "id": "req_hxh471xetrcprHdR1JA8z",
+      "timestamp": 1733997971.431954,
+      "operations": 5
+    },
+    "type": {
+      "deepfake": 0.01
+    },
+    "media": {
+      "id": "med_hxh4iySbajnOdOjLyN5fm",
+      "uri": "face.jpeg"
+    }
+  },
+  "standardized_response": {
+    "deepfake_score": 0.01,
+    "prediction": "original"
+  }
+}

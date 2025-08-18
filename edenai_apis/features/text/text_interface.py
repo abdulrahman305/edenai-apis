@@ -20,7 +20,9 @@ from edenai_apis.features.text import (
     PromptOptimizationDataClass,
     EmotionDetectionDataClass,
 )
-from edenai_apis.features.text.ai_detection.ai_detection_dataclass import AiDetectionDataClass
+from edenai_apis.features.text.ai_detection.ai_detection_dataclass import (
+    AiDetectionDataClass,
+)
 from edenai_apis.features.text.chat.chat_dataclass import StreamChat
 from edenai_apis.features.text.embeddings.embeddings_dataclass import (
     EmbeddingsDataClass,
@@ -37,7 +39,12 @@ from edenai_apis.utils.types import ResponseType
 class TextInterface:
     @abstractmethod
     def text__anonymization(
-        self, text: str, language: str
+        self,
+        text: str,
+        language: str,
+        model: Optional[str] = None,
+        provider_params: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> ResponseType[AnonymizationDataClass]:
         """
         Anonymize text by hiding every *sensitive* words
@@ -51,7 +58,11 @@ class TextInterface:
 
     @abstractmethod
     def text__moderation(
-        self, text: str, language: str
+        self,
+        language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[ModerationDataClass]:
         """
         Detects explecit content, profanity, and personal information
@@ -66,7 +77,11 @@ class TextInterface:
 
     @abstractmethod
     def text__keyword_extraction(
-        self, language: str, text: str
+        self,
+        language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[KeywordExtractionDataClass]:
         """
         Extract Keywords from a given text
@@ -79,7 +94,11 @@ class TextInterface:
 
     @abstractmethod
     def text__named_entity_recognition(
-        self, language: str, text: str
+        self,
+        language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[NamedEntityRecognitionDataClass]:
         """
         Automatically identifies named entities in a text
@@ -100,6 +119,7 @@ class TextInterface:
         examples_context: str,
         examples: List[List[str]],
         model: Optional[str],
+        **kwargs,
     ) -> ResponseType[QuestionAnswerDataClass]:
         """
         Ask question related to given texts and get an answer
@@ -127,6 +147,7 @@ class TextInterface:
             "cosine", "hamming", "manhattan", "euclidean"
         ] = "cosine",
         model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[SearchDataClass]:
         """
         Do sementic search over a set of texts
@@ -141,7 +162,11 @@ class TextInterface:
 
     @abstractmethod
     def text__sentiment_analysis(
-        self, language: str, text: str
+        self,
+        language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[SentimentAnalysisDataClass]:
         """
         Analyze sentiment of a text
@@ -159,6 +184,7 @@ class TextInterface:
         output_sentences: int,
         language: str,
         model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[SummarizeDataClass]:
         """
         Summarize a given text in a given number of sentences
@@ -174,7 +200,10 @@ class TextInterface:
     ### Syntax analysis
     @abstractmethod
     def text__syntax_analysis(
-        self, language: str, text: str
+        self,
+        language: str,
+        text: str,
+        **kwargs,
     ) -> ResponseType[SyntaxAnalysisDataClass]:
         """
         Syntax analysis consists principally in highlighting the structure of a text.
@@ -187,7 +216,11 @@ class TextInterface:
 
     @abstractmethod
     def text__topic_extraction(
-        self, language: str, text: str
+        self,
+        language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[TopicExtractionDataClass]:
         """
         Extract Keywords from a given text
@@ -205,6 +238,7 @@ class TextInterface:
         temperature: float,
         max_tokens: int,
         model: str,
+        **kwargs,
     ) -> ResponseType[GenerationDataClass]:
         """
         Text generation from a given prompt
@@ -216,7 +250,13 @@ class TextInterface:
 
     @abstractmethod
     def text__code_generation(
-        self, instruction: str, temperature: float, max_tokens: int, prompt: str = ""
+        self,
+        instruction: str,
+        temperature: float,
+        max_tokens: int,
+        prompt: str = "",
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[CodeGenerationDataClass]:
         """Code generation
 
@@ -240,6 +280,8 @@ class TextInterface:
         text: str,
         entities: List[str],
         examples: Optional[List[Dict]] = None,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[CustomNamedEntityRecognitionDataClass]:
         """Custom named entity recognition
 
@@ -254,7 +296,12 @@ class TextInterface:
 
     @abstractmethod
     def text__custom_classification(
-        self, texts: List[str], labels: List[str], examples: List[Tuple[str, str]]
+        self,
+        texts: List[str],
+        labels: List[str],
+        examples: List[Tuple[str, str]],
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[CustomClassificationDataClass]:
         """custom text classification
 
@@ -273,7 +320,11 @@ class TextInterface:
 
     @abstractmethod
     def text__spell_check(
-        self, text: str, language: str
+        self,
+        text: str,
+        language: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[SpellCheckDataClass]:
         """Spell check
 
@@ -288,7 +339,10 @@ class TextInterface:
 
     @abstractmethod
     def text__embeddings(
-        self, texts: List[str], model: Optional[str] = None
+        self,
+        texts: List[str],
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[EmbeddingsDataClass]:
         """Text embeddings
 
@@ -310,6 +364,10 @@ class TextInterface:
         max_tokens: int = 25,
         model: Optional[str] = None,
         stream: bool = False,
+        available_tools: Optional[List[dict]] = None,
+        tool_choice: Literal["auto", "required", "none"] = "auto",
+        tool_results: Optional[List[dict]] = None,
+        **kwargs,
     ) -> ResponseType[Union[ChatDataClass, StreamChat]]:
         """Text chat
 
@@ -328,9 +386,7 @@ class TextInterface:
 
     @abstractmethod
     def text__ai_detection(
-        self,
-        text: str,
-        provider_params: Optional[Dict[str, Any]] = None,
+        self, text: str, provider_params: Optional[Dict[str, Any]] = None, **kwargs
     ) -> ResponseType[AiDetectionDataClass]:
         """
         Detects if a given text is generated by an AI language model (LLM) or not.
@@ -344,7 +400,10 @@ class TextInterface:
 
     @abstractmethod
     def text__prompt_optimization(
-        self, text: str, target_provider: str
+        self,
+        text: str,
+        target_provider: str,
+        **kwargs,
     ) -> ResponseType[PromptOptimizationDataClass]:
         """
         Generate a prompt given a User description for generative providers eg : 'OpenAI', 'Google' & 'Cohere
@@ -356,7 +415,9 @@ class TextInterface:
         raise NotImplementedError
 
     @abstractmethod
-    def text__entity_sentiment(self, text: str, language: str) -> ResponseType:
+    def text__entity_sentiment(
+        self, text: str, language: str, **kwargs
+    ) -> ResponseType:
         """
         Detect sentiment of entities foung through the given text
         """
@@ -368,6 +429,7 @@ class TextInterface:
         text: str,
         title: str = "",
         provider_params: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> ResponseType[PlagiaDetectionDataClass]:
         """
         Detects plagiarized content within a given text
@@ -382,7 +444,7 @@ class TextInterface:
 
     @abstractmethod
     def text__emotion_detection(
-        self, text: str
+        self, text: str, **kwargs
     ) -> ResponseType[EmotionDetectionDataClass]:
         """
         Detect emotion of a given text

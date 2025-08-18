@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 from http import HTTPStatus
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -37,6 +37,7 @@ class OriginalityaiApi(ProviderInterface, TextInterface):
         text: str,
         title: str = "",
         provider_params: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> ResponseType[PlagiaDetectionDataClass]:
         url = f"{self.base_url}/plag"
         payload = {"content": text, "title": title}
@@ -47,14 +48,15 @@ class OriginalityaiApi(ProviderInterface, TextInterface):
         try:
             original_response = response.json()
         except json.JSONDecodeError as exc:
-            print(response.status_code)
-            print(response.text)
             raise ProviderException(
                 message="Internal Server Error", code=response.status_code
             ) from exc
 
         if response.status_code != HTTPStatus.OK:
-            raise ProviderException(response.json(), code=response.status_code)
+            raise ProviderException(
+                original_response.get("message") or original_response,
+                code=response.status_code,
+            )
 
         total_score = float(
             int(original_response["total_text_score"].replace("%", "")) / 100
@@ -68,7 +70,7 @@ class OriginalityaiApi(ProviderInterface, TextInterface):
                 candidates.append(
                     PlagiaDetectionCandidate(
                         url=match["website"],
-                        plagia_score=match["score"] / 100,
+                        plagia_score=int(match["score"]) / 100,
                         plagiarized_text=match["pText"],
                     )
                 )
@@ -90,7 +92,7 @@ class OriginalityaiApi(ProviderInterface, TextInterface):
         return result
 
     def text__ai_detection(
-        self, text: str, provider_params: Optional[Dict[str, Any]] = None
+        self, text: str, provider_params: Optional[Dict[str, Any]] = None, **kwargs
     ) -> ResponseType[AiDetectionDataClass]:
         url = f"{self.base_url}/ai"
         payload = {
@@ -110,9 +112,10 @@ class OriginalityaiApi(ProviderInterface, TextInterface):
                 message="Internal Server Error", code=response.status_code
             ) from exc
 
-        if response.status_code != 200:
+        if response.status_code != HTTPStatus.OK:
             raise ProviderException(
-                original_response.get("error"), code=response.status_code
+                original_response.get("message") or original_response,
+                code=response.status_code,
             )
 
         default_dict = defaultdict(lambda: None)

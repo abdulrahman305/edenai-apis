@@ -5,8 +5,12 @@ from typing import Dict
 import requests
 
 from edenai_apis.features import OcrInterface, ProviderInterface
-from edenai_apis.features.ocr.financial_parser.financial_parser_dataclass import FinancialParserDataClass
-from edenai_apis.features.ocr.identity_parser.identity_parser_dataclass import IdentityParserDataClass
+from edenai_apis.features.ocr.financial_parser.financial_parser_dataclass import (
+    FinancialParserDataClass,
+)
+from edenai_apis.features.ocr.identity_parser.identity_parser_dataclass import (
+    IdentityParserDataClass,
+)
 from edenai_apis.features.ocr.invoice_parser import InvoiceParserDataClass
 from edenai_apis.features.ocr.receipt_parser import ReceiptParserDataClass
 from edenai_apis.features.ocr.resume_parser import ResumeParserDataClass
@@ -18,8 +22,9 @@ from edenai_apis.apis.klippa.klippa_ocr_normalizer import (
     klippa_financial_parser,
     klippa_id_parser,
     klippa_receipt_parser,
-    klippa_resume_parser
+    klippa_resume_parser,
 )
+
 
 class KlippaApi(ProviderInterface, OcrInterface):
     provider_name = "klippa"
@@ -46,10 +51,8 @@ class KlippaApi(ProviderInterface, OcrInterface):
 
         try:
             original_response = response.json()
-        except JSONDecodeError:
-            raise ProviderException(
-                message="Internal Server Error", code=500
-            ) from JSONDecodeError
+        except JSONDecodeError as exc:
+            raise ProviderException(message="Internal Server Error", code=500) from exc
 
         if response.status_code != 200:
             raise ProviderException(message=response.json(), code=response.status_code)
@@ -57,12 +60,10 @@ class KlippaApi(ProviderInterface, OcrInterface):
         return original_response
 
     def ocr__invoice_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[InvoiceParserDataClass]:
-        file_ = open(file, "rb")
-        original_response = self._make_post_request(file_)
-
-        file_.close()
+        with open(file, "rb") as file_:
+            original_response = self._make_post_request(file_)
         standardize_response = klippa_invoice_parser(original_response)
 
         return ResponseType[InvoiceParserDataClass](
@@ -71,12 +72,10 @@ class KlippaApi(ProviderInterface, OcrInterface):
         )
 
     def ocr__receipt_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[ReceiptParserDataClass]:
-        file_ = open(file, "rb")
-        original_response = self._make_post_request(file_)
-
-        file_.close()
+        with open(file, "rb") as file_:
+            original_response = self._make_post_request(file_)
 
         standardize_response = klippa_receipt_parser(original_response)
         return ResponseType[ReceiptParserDataClass](
@@ -85,11 +84,10 @@ class KlippaApi(ProviderInterface, OcrInterface):
         )
 
     def ocr__identity_parser(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[IdentityParserDataClass]:
-        file_ = open(file, "rb")
-        original_response = self._make_post_request(file_, endpoint="/identity")
-        file_.close()
+        with open(file, "rb") as file_:
+            original_response = self._make_post_request(file_, endpoint="/identity")
 
         standardized_response = klippa_id_parser(original_response)
         return ResponseType[IdentityParserDataClass](
@@ -98,29 +96,32 @@ class KlippaApi(ProviderInterface, OcrInterface):
         )
 
     def ocr__resume_parser(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[ResumeParserDataClass]:
-        file_ = open(file, "rb")
-        original_response = self._make_post_request(file_, endpoint="/resume")
-        file_.close()
-        
+        with open(file, "rb") as file_:
+            original_response = self._make_post_request(file_, endpoint="/resume")
+
         standardized_response = klippa_resume_parser(original_response)
         return ResponseType[ResumeParserDataClass](
             original_response=original_response,
             standardized_response=standardized_response,
         )
-    
-    def ocr__financial_parser(
-        self, file: str, language: str, document_type: str = "", file_url: str = ""
-    ) -> ResponseType[FinancialParserDataClass]:
-        file_ = open(file, "rb")
-        original_response = self._make_post_request(file_)
 
-        file_.close()
+    def ocr__financial_parser(
+        self,
+        file: str,
+        language: str,
+        document_type: str = "",
+        file_url: str = "",
+        model: str = None,
+        **kwargs,
+    ) -> ResponseType[FinancialParserDataClass]:
+        with open(file, "rb") as file_:
+            original_response = self._make_post_request(file_)
 
         standardize_response = klippa_financial_parser(original_response)
 
         return ResponseType[FinancialParserDataClass](
-                    original_response=original_response,
-                    standardized_response=standardize_response,
-                )
+            original_response=original_response,
+            standardized_response=standardize_response,
+        )

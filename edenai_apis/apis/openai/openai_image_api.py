@@ -1,15 +1,19 @@
 import base64
 from io import BytesIO
-from json import JSONDecodeError
 from typing import Sequence, Literal, Optional
 
-import openai
-import requests
+from openai import APIError
+import mimetypes
 
 from edenai_apis.features import ImageInterface
+from edenai_apis.features.image.explicit_content.explicit_content_dataclass import (
+    ExplicitContentDataClass,
+)
 from edenai_apis.features.image.generation import (
     GenerationDataClass as ImageGenerationDataClass,
-    GeneratedImageDataClass,
+)
+from edenai_apis.features.image.logo_detection.logo_detection_dataclass import (
+    LogoDetectionDataClass,
 )
 from edenai_apis.features.image.variation import (
     VariationDataClass,
@@ -17,49 +21,24 @@ from edenai_apis.features.image.variation import (
 )
 from edenai_apis.utils.types import ResponseType
 from edenai_apis.utils.upload_s3 import USER_PROCESS, upload_file_bytes_to_s3
-from .helpers import (
-    get_openapi_response,
-)
 from ...features.image.question_answer import QuestionAnswerDataClass
 from ...utils.exception import ProviderException
 
 
 class OpenaiImageApi(ImageInterface):
+
     def image__generation(
         self,
         text: str,
         resolution: Literal["256x256", "512x512", "1024x1024"],
         num_images: int = 1,
         model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[ImageGenerationDataClass]:
-        url = f"{self.url}/images/generations"
-        payload = {
-            "prompt": text,
-            "model": model,
-            "n": num_images,
-            "size": resolution,
-            "response_format": "b64_json",
-        }
-        response = requests.post(url, json=payload, headers=self.headers)
-        original_response = get_openapi_response(response)
-
-        generations: Sequence[GeneratedImageDataClass] = []
-        for generated_image in original_response.get("data"):
-            image_b64 = generated_image.get("b64_json")
-
-            image_data = image_b64.encode()
-            image_content = BytesIO(base64.b64decode(image_data))
-            resource_url = upload_file_bytes_to_s3(image_content, ".png", USER_PROCESS)
-            generations.append(
-                GeneratedImageDataClass(
-                    image=image_b64, image_resource_url=resource_url
-                )
-            )
-
-        return ResponseType[ImageGenerationDataClass](
-            original_response=original_response,
-            standardized_response=ImageGenerationDataClass(items=generations),
+        response = self.llm_client.image_generation(
+            prompt=text, resolution=resolution, n=num_images, model=model
         )
+        return response
 
     def image__question_answer(
         self,
@@ -69,89 +48,49 @@ class OpenaiImageApi(ImageInterface):
         file_url: str = "",
         model: Optional[str] = None,
         question: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[QuestionAnswerDataClass]:
         with open(file, "rb") as fstream:
             file_content = fstream.read()
             file_b64 = base64.b64encode(file_content).decode("utf-8")
-
-            url = f"{self.url}/chat/completions"
-            payload = {
-                "model": "gpt-4-vision-preview" or model,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": question or "Describe the following image",
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{file_b64}"
-                                },
-                            },
-                        ],
-                    },
-                ],
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-            }
-
-            response = requests.post(url, json=payload, headers=self.headers)
-
-            if response.status_code >= 500:
-                raise ProviderException(
-                    f"OpenAI API is not available. Status code: {response.status_code}"
-                )
-
-            if response.status_code != 200:
-                raise ProviderException(
-                    message=response.text, code=response.status_code
-                )
-
-            try:
-                original_response = response.json()
-            except JSONDecodeError as exc:
-                raise ProviderException(
-                    message="Invalid JSON response", code=response.status_code
-                ) from exc
-
-            standardized_response = QuestionAnswerDataClass(
-                answers=[original_response["choices"][0]["message"]["content"]]
-            )
-
-            return ResponseType[QuestionAnswerDataClass](
-                original_response=original_response,
-                standardized_response=standardized_response,
-            )
+        mime_type = mimetypes.guess_type(file)[0]
+        image_data = f"data:{mime_type};base64,{file_b64}"
+        response = self.llm_client.image_qa(
+            image_data=image_data,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            model=model,
+            question=question,
+        )
+        return response
 
     def image__variation(
         self,
         file: str,
-        prompt: Optional[str] = "",
+        prompt: Optional[str],
         num_images: Optional[int] = 1,
         resolution: Literal["256x256", "512x512", "1024x1024"] = "512x512",
-        temperature: Optional[int] = 0.3,
+        temperature: Optional[float] = 0.3,
         model: Optional[str] = None,
         file_url: str = "",
+        **kwargs,
     ) -> ResponseType[VariationDataClass]:
         try:
-            response = openai.Image.create_variation(
-                image=open(file, "rb"),
-                n=num_images,
-                model=model,
-                size=resolution,
-                response_format="b64_json",
-            )
-        except openai.OpenAIError as error:
+            with open(file, "rb") as file_:
+                response = self.client.images.create_variation(
+                    image=file_,
+                    n=num_images,
+                    model=model,
+                    size=resolution,
+                    response_format="b64_json",
+                )
+        except APIError as error:
             raise ProviderException(message=error.user_message, code=error.code)
 
         original_response = response
         generations: Sequence[VariationImageDataClass] = []
-        for generated_image in original_response.get("data"):
-            image_b64 = generated_image.get("b64_json")
-
+        for generated_image in original_response.data:
+            image_b64 = generated_image.b64_json
             image_data = image_b64.encode()
             image_content = BytesIO(base64.b64decode(image_data))
             resource_url = upload_file_bytes_to_s3(image_content, ".png", USER_PROCESS)
@@ -162,6 +101,22 @@ class OpenaiImageApi(ImageInterface):
             )
 
         return ResponseType[VariationDataClass](
-            original_response=original_response,
+            original_response=original_response.to_dict(),
             standardized_response=VariationDataClass(items=generations),
         )
+
+    def image__explicit_content(
+        self, file: str, file_url: str = "", model: Optional[str] = None, **kwargs
+    ) -> ResponseType[ExplicitContentDataClass]:
+        response = self.llm_client.image_moderation(
+            file=file, file_url=file_url, model=model
+        )
+        return response
+
+    def image__logo_detection(
+        self, file: str, file_url: str = "", model: str = None, **kwargs
+    ) -> ResponseType[LogoDetectionDataClass]:
+        response = self.llm_client.logo_detection(
+            file=file, file_url=file_url, model=model, **kwargs
+        )
+        return response

@@ -96,11 +96,7 @@ class Ai21labsApi(ProviderInterface, TextInterface):
         return total_tokens
 
     def text__generation(
-        self,
-        text: str,
-        temperature: float,
-        max_tokens: int,
-        model: str,
+        self, text: str, temperature: float, max_tokens: int, model: str, **kwargs
     ) -> ResponseType[GenerationDataClass]:
         response_body = self.__ai21labs_bedrock_request(
             text=text, temperature=temperature, max_tokens=max_tokens, model=model
@@ -117,27 +113,8 @@ class Ai21labsApi(ProviderInterface, TextInterface):
             standardized_response=standardized_response,
         )
 
-    def text__summarize(
-        self,
-        text: str,
-        output_sentences: int,
-        language: str,
-        model: Optional[str] = None
-    ) -> ResponseType[SummarizeDataClass]:
-        payload = {"source": text, "sourceType": "TEXT"}
-        original_response = self.__ai21labs_api_request(
-            url="summarize", payload=payload
-        )
-        summary = original_response.get("summary")
-        standardized_response = SummarizeDataClass(result=summary)
-
-        return ResponseType[SummarizeDataClass](
-            original_response=original_response,
-            standardized_response=standardized_response,
-        )
-
     def text__embeddings(
-        self, texts: List[str], model: Optional[str] = None
+        self, texts: List[str], model: Optional[str] = None, **kwargs
     ) -> ResponseType[EmbeddingsDataClass]:
         payload = {"texts": texts}
         original_response = self.__ai21labs_api_request(url="embed", payload=payload)
@@ -151,29 +128,4 @@ class Ai21labsApi(ProviderInterface, TextInterface):
         return ResponseType[EmbeddingsDataClass](
             original_response=original_response,
             standardized_response=standardized_response,
-        )
-
-    def text__spell_check(
-        self, text: str, language: str
-    ) -> ResponseType[SpellCheckDataClass]:
-        payload = {"text": text}
-        original_response = self.__ai21labs_api_request(url="gec", payload=payload)
-        items = []
-        for correction in original_response.get("corrections"):
-            start_index = correction.get("startIndex")
-            end_index = correction.get("endIndex")
-            length = end_index - start_index
-            spell_check_item = SpellCheckItem(
-                text=correction.get("originalText"),
-                suggestions=[
-                    SuggestionItem(suggestion=correction.get("suggestion"), score=None)
-                ],
-                offset=start_index,
-                length=length,
-                type=correction.get("correctionType"),
-            )
-            items.append(spell_check_item)
-        return ResponseType[SpellCheckDataClass](
-            original_response=original_response,
-            standardized_response=SpellCheckDataClass(text=text, items=items),
         )

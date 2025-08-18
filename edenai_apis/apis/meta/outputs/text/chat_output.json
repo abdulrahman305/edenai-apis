@@ -1,24 +1,55 @@
 {
   "original_response": {
-    "generation": "barack obama, united states, democratic party, illinois",
-    "prompt_token_count": 290,
-    "generation_token_count": 17,
-    "stop_reason": "stop",
+    "id": "chatcmpl-dbb4ec18-d56c-43d4-af6c-275b90bd2753",
+    "created": 1738335789,
+    "model": "meta.llama3-1-70b-instruct-v1:0",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "\n\nBarack Obama, Democratic Party, United States, Illinois",
+          "role": "assistant",
+          "tool_calls": null,
+          "function_call": null
+        }
+      }
+    ],
+    "provider_time": 3479489610,
+    "edenai_time": null,
     "usage": {
-      "total_tokens": 307
-    }
+      "completion_tokens": 13,
+      "prompt_tokens": 227,
+      "total_tokens": 240,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": null
+    },
+    "cost": 0.0002376
   },
   "standardized_response": {
-    "generated_text": "barack obama, united states, democratic party, illinois",
+    "generated_text": "\n\nBarack Obama, Democratic Party, United States, Illinois",
     "message": [
       {
         "role": "user",
-        "message": "Barack Hussein Obama is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, Obama was the first African-American president of the United States. He previously served as a U.S. senator from Illinois from 2005 to 2008 and as an Illinois state senator from 1997 to 2004."
+        "message": "Barack Hussein Obama is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, Obama was the first African-American president of the United States. He previously served as a U.S. senator from Illinois from 2005 to 2008 and as an Illinois state senator from 1997 to 2004.",
+        "tools": null,
+        "tool_calls": null
       },
       {
         "role": "assistant",
-        "message": "barack obama, united states, democratic party, illinois"
+        "message": "\n\nBarack Obama, Democratic Party, United States, Illinois",
+        "tools": null,
+        "tool_calls": []
       }
     ]
+  },
+  "usage": {
+    "completion_tokens": 13,
+    "prompt_tokens": 227,
+    "total_tokens": 240,
+    "completion_tokens_details": null,
+    "prompt_tokens_details": null
   }
 }

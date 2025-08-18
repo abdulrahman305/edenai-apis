@@ -7,10 +7,13 @@
 | | amazon |
 | | base64 |
 | | dataleon |
+| | eagledoc |
+| | extracta |
 | | google |
 | | klippa |
 | | microsoft |
 | | mindee |
+| | openai |
 | | tabscanner |
 | | veryfi |
 | **identity_parser** | affinda |
@@ -19,10 +22,12 @@
 | | klippa |
 | | microsoft |
 | | mindee |
+| | openai |
 | **invoice_parser** | affinda |
 | | amazon |
 | | base64 |
 | | dataleon |
+| | eagledoc |
 | | google |
 | | klippa |
 | | microsoft |
@@ -33,6 +38,7 @@
 | | amazon |
 | | base64 |
 | | dataleon |
+| | eagledoc |
 | | google |
 | | klippa |
 | | microsoft |
@@ -43,6 +49,7 @@
 | | extracta |
 | | hireability |
 | | klippa |
+| | openai |
 | | senseloaf |
 | **custom_document_parsing_async** | amazon |
 | | extracta |
@@ -91,20 +98,11 @@
 | | meta |
 | | mistral |
 | | openai |
-| **spell_check** | ai21labs |
-| | cohere |
-| | microsoft |
-| | nlpcloud |
-| | openai |
-| | prowritingaid |
-| | sapling |
-| **summarize** | ai21labs |
-| | alephalpha |
+| **summarize** | alephalpha |
 | | anthropic |
 | | cohere |
 | | connexun |
 | | emvista |
-| | huggingface |
 | | meaningcloud |
 | | microsoft |
 | | nlpcloud |
@@ -116,6 +114,7 @@
 | | microsoft |
 | | oneai |
 | | openai |
+| | privateai |
 | **entity_sentiment** | amazon |
 | | google |
 | **keyword_extraction** | amazon |
@@ -173,6 +172,12 @@
 | **search** | cohere |
 | | google |
 | | openai |
+| **spell_check** | cohere |
+| | microsoft |
+| | nlpcloud |
+| | openai |
+| | prowritingaid |
+| | sapling |
 | **code_generation** | google |
 | | nlpcloud |
 | | openai |
@@ -180,12 +185,11 @@
 | | ibm |
 | | openai |
 | | tenstorrent |
-| **question_answer** | huggingface |
-| | openai |
-| | tenstorrent |
 | **emotion_detection** | nlpcloud |
 | | vernai |
 | **prompt_optimization** | openai |
+| **question_answer** | openai |
+| | tenstorrent |
 | **ai_detection** | originalityai |
 | | sapling |
 | | winstonai |
@@ -198,6 +202,8 @@
 | Subfeatures | Providers |
 |----------|-------------|
 | **embeddings** | alephalpha |
+| | amazon |
+| | google |
 | **question_answer** | alephalpha |
 | | google |
 | | openai |
@@ -206,6 +212,7 @@
 | | clarifai |
 | | google |
 | | microsoft |
+| | openai |
 | | picpurify |
 | | sentisight |
 | **face_compare** | amazon |
@@ -223,6 +230,7 @@
 | | microsoft |
 | **generation** | amazon |
 | | deepai |
+| | leonardo |
 | | openai |
 | | replicate |
 | | stabilityai |
@@ -232,18 +240,21 @@
 | | google |
 | | microsoft |
 | | sentisight |
+| **logo_detection** | anthropic |
+| | api4ai |
+| | clarifai |
+| | google |
+| | microsoft |
+| | openai |
+| | smartclick |
 | **anonymization** | api4ai |
 | **background_removal** | api4ai |
 | | clipdrop |
 | | microsoft |
 | | photoroom |
+| | picsart |
 | | sentisight |
 | | stabilityai |
-| **logo_detection** | api4ai |
-| | clarifai |
-| | google |
-| | microsoft |
-| | smartclick |
 | **generation_fine_tuning** | astria |
 | **landmark_detection** | google |
 | | microsoft |
@@ -252,6 +263,8 @@
 | | sentisight |
 | **variation** | openai |
 | | stabilityai |
+| **deepfake_detection** | sightengine |
+| **ai_detection** | winstonai |
 
 </details>
 <details><summary>audio</summary>
@@ -275,6 +288,7 @@
 | | voci |
 | | voxist |
 | **text_to_speech** | amazon |
+| | deepgram |
 | | elevenlabs |
 | | google |
 | | ibm |
@@ -292,7 +306,6 @@
 | **automatic_translation** | amazon |
 | | deepl |
 | | google |
-| | huggingface |
 | | ibm |
 | | microsoft |
 | | modernmt |
@@ -329,6 +342,10 @@
 | **logo_detection_async** | google |
 | | twelvelabs |
 | **object_tracking_async** | google |
+| **question_answer** | google |
+| **question_answer_async** | google |
+| **shot_change_detection_async** | google |
+| **deepfake_detection_async** | sightengine |
 
 </details>
 <details><summary>multimodal</summary>
@@ -360,8 +377,6 @@
 |----------|-------------|
 | **text** | embeddings |
 | | generation |
-| | spell_check |
-| | summarize |
 
 </details>
 <details><summary>alephalpha</summary>
@@ -380,7 +395,8 @@
 | **audio** | speech_to_text_async |
 | | text_to_speech |
 | | text_to_speech_async |
-| **image** | explicit_content |
+| **image** | embeddings |
+| | explicit_content |
 | | face_compare |
 | | face_detection |
 | | face_recognition |
@@ -415,6 +431,7 @@
 
 | Features | Subfeatures |
 |----------|-------------|
+| **image** | logo_detection |
 | **multimodal** | chat |
 | **text** | chat |
 | | generation |
@@ -533,6 +550,7 @@
 | Features | Subfeatures |
 |----------|-------------|
 | **audio** | speech_to_text_async |
+| | text_to_speech |
 
 </details>
 <details><summary>deepl</summary>
@@ -541,6 +559,15 @@
 |----------|-------------|
 | **translation** | automatic_translation |
 | | document_translation |
+
+</details>
+<details><summary>eagledoc</summary>
+
+| Features | Subfeatures |
+|----------|-------------|
+| **ocr** | financial_parser |
+| | invoice_parser |
+| | receipt_parser |
 
 </details>
 <details><summary>elevenlabs</summary>
@@ -567,6 +594,7 @@
 |----------|-------------|
 | **ocr** | bank_check_parsing |
 | | custom_document_parsing_async |
+| | financial_parser |
 | | resume_parser |
 
 </details>
@@ -598,7 +626,8 @@
 |----------|-------------|
 | **audio** | speech_to_text_async |
 | | text_to_speech |
-| **image** | explicit_content |
+| **image** | embeddings |
+| | explicit_content |
 | | face_detection |
 | | landmark_detection |
 | | logo_detection |
@@ -631,6 +660,9 @@
 | | logo_detection_async |
 | | object_tracking_async |
 | | person_tracking_async |
+| | question_answer |
+| | question_answer_async |
+| | shot_change_detection_async |
 | | text_detection_async |
 
 </details>
@@ -639,15 +671,6 @@
 | Features | Subfeatures |
 |----------|-------------|
 | **ocr** | resume_parser |
-
-</details>
-<details><summary>huggingface</summary>
-
-| Features | Subfeatures |
-|----------|-------------|
-| **text** | question_answer |
-| | summarize |
-| **translation** | automatic_translation |
 
 </details>
 <details><summary>ibm</summary>
@@ -681,6 +704,13 @@
 | | invoice_parser |
 | | receipt_parser |
 | | resume_parser |
+
+</details>
+<details><summary>leonardo</summary>
+
+| Features | Subfeatures |
+|----------|-------------|
+| **image** | generation |
 
 </details>
 <details><summary>lettria</summary>
@@ -826,10 +856,15 @@
 |----------|-------------|
 | **audio** | speech_to_text_async |
 | | text_to_speech |
-| **image** | generation |
+| **image** | explicit_content |
+| | generation |
+| | logo_detection |
 | | question_answer |
 | | variation |
 | **multimodal** | chat |
+| **ocr** | financial_parser |
+| | identity_parser |
+| | resume_parser |
 | **text** | anonymization |
 | | chat |
 | | code_generation |
@@ -888,11 +923,19 @@
 | | face_detection |
 
 </details>
+<details><summary>picsart</summary>
+
+| Features | Subfeatures |
+|----------|-------------|
+| **image** | background_removal |
+
+</details>
 <details><summary>privateai</summary>
 
 | Features | Subfeatures |
 |----------|-------------|
 | **ocr** | anonymization_async |
+| **text** | anonymization |
 
 </details>
 <details><summary>prowritingaid</summary>
@@ -956,6 +999,14 @@
 | | object_detection |
 | | search |
 | **ocr** | ocr |
+
+</details>
+<details><summary>sightengine</summary>
+
+| Features | Subfeatures |
+|----------|-------------|
+| **image** | deepfake_detection |
+| **video** | deepfake_detection_async |
 
 </details>
 <details><summary>skybiometry</summary>
@@ -1057,6 +1108,7 @@
 
 | Features | Subfeatures |
 |----------|-------------|
+| **image** | ai_detection |
 | **text** | ai_detection |
 | | plagia_detection |
 

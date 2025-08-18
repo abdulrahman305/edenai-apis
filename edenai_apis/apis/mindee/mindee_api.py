@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 from io import BufferedReader
-from typing import Dict, Optional, Sequence, TypeVar
+from typing import Dict, Optional, Sequence, TypeVar, TypedDict
 
 import requests
 
@@ -61,7 +61,10 @@ from edenai_apis.utils.types import (
     AsyncResponseType,
 )
 
-ParamsApi = TypeVar("ParamsApi")
+
+class RequestParams(TypedDict):
+    headers: Dict[str, str]
+    files: Dict[str, BufferedReader]
 
 
 class MindeeApi(ProviderInterface, OcrInterface):
@@ -89,37 +92,23 @@ class MindeeApi(ProviderInterface, OcrInterface):
             "https://api.mindee.net/v1/products/mindee/invoice_splitter/v1/"
         )
 
-    def _get_api_attributes(
-        self, file: BufferedReader, language: Optional[str] = None
-    ) -> ParamsApi:
-        params: ParamsApi = {
-            "headers": {"Authorization": self.api_key},
-            "files": {"document": file},
-            "params": {
-                "local": {
-                    "langage": language.split("-")[0],
-                    "country": language.split("-")[1],
-                }
-            }
-            if language
-            else None,
-        }
-        return params
+    def _get_api_attributes(self, file: BufferedReader) -> RequestParams:
+        return RequestParams(
+            headers={"Authorization": self.api_key},
+            files={"document": file},
+        )
 
     def ocr__receipt_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[ReceiptParserDataClass]:
-        file_ = open(file, "rb")
-        args = self._get_api_attributes(file_, language)
-        response = requests.post(
-            self.url_receipt,
-            headers=args["headers"],
-            files=args["files"],
-            params=args["params"],
-        )
-        original_response = response.json()
-
-        file_.close()
+        with open(file, "rb") as file_:
+            args = self._get_api_attributes(file_)
+            response = requests.post(
+                self.url_receipt,
+                headers=args["headers"],
+                files=args["files"],
+            )
+            original_response = response.json()
 
         if "document" not in original_response:
             raise ProviderException(
@@ -203,18 +192,15 @@ class MindeeApi(ProviderInterface, OcrInterface):
         return result
 
     def ocr__invoice_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[InvoiceParserDataClass]:
         headers = {
             "Authorization": self.api_key,
         }
-        file_ = open(file, "rb")
-        files = {"document": file_}
-        params = {"locale": {"language": language}}
-        response = requests.post(self.url, headers=headers, files=files, params=params)
-        original_response = response.json()
-
-        file_.close()
+        with open(file, "rb") as file_:
+            files = {"document": file_}
+            response = requests.post(self.url, headers=headers, files=files)
+            original_response = response.json()
 
         if "document" not in original_response:
             raise ProviderException(
@@ -364,16 +350,14 @@ class MindeeApi(ProviderInterface, OcrInterface):
         return result
 
     def ocr__identity_parser(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[IdentityParserDataClass]:
-        file_ = open(file, "rb")
-        args = self._get_api_attributes(file_)
+        with open(file, "rb") as file_:
+            args = self._get_api_attributes(file_)
 
-        response = requests.post(
-            url=self.url_identity, files=args["files"], headers=args["headers"]
-        )
-
-        file_.close()
+            response = requests.post(
+                url=self.url_identity, files=args["files"], headers=args["headers"]
+            )
 
         original_response = response.json()
         if response.status_code != 201:
@@ -465,32 +449,31 @@ class MindeeApi(ProviderInterface, OcrInterface):
         )
 
     def ocr__bank_check_parsing(
-        self,
-        file: str,
-        file_url: str = "",
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[BankCheckParsingDataClass]:
-        file_ = open(file, "rb")
-        headers = {
-            "Authorization": self.api_key,
-        }
-        files = {"document": file_}
+        with open(file, "rb") as file_:
+            headers = {
+                "Authorization": self.api_key,
+            }
+            files = {"document": file_}
 
-        try:
-            response = requests.post(self.url_bank_check, headers=headers, files=files)
-        except:
-            raise ProviderException(
-                "Something went wrong when calling this feature", code=500
-            )
-        original_response = response.json()
-        if response.status_code >= 400 or "document" not in original_response:
-            api_response = original_response.get("api_request", {}) or {}
-            error = api_response.get("error", {}) or {}
-            error_message = (
-                error.get("message", "")
-                or "A provider error occurred while calling this feature"
-            )
-            raise ProviderException(error_message, code=response.status_code)
-        file_.close()
+            try:
+                response = requests.post(
+                    self.url_bank_check, headers=headers, files=files
+                )
+            except:
+                raise ProviderException(
+                    "Something went wrong when calling this feature", code=500
+                )
+            original_response = response.json()
+            if response.status_code >= 400 or "document" not in original_response:
+                api_response = original_response.get("api_request", {}) or {}
+                error = api_response.get("error", {}) or {}
+                error_message = (
+                    error.get("message", "")
+                    or "A provider error occurred while calling this feature"
+                )
+                raise ProviderException(error_message, code=response.status_code)
         bank_check_data = original_response["document"]["inference"]["prediction"]
         default_dict = defaultdict(lambda: None)
 
@@ -539,20 +522,21 @@ class MindeeApi(ProviderInterface, OcrInterface):
         )
 
     def ocr__financial_parser(
-        self, file: str, language: str, document_type: str = "", file_url: str = ""
+        self,
+        file: str,
+        language: str,
+        document_type: str = "",
+        file_url: str = "",
+        model: str = None,
+        **kwargs,
     ) -> ResponseType[FinancialParserDataClass]:
         headers = {
             "Authorization": self.api_key,
         }
-        file_ = open(file, "rb")
-        files = {"document": file_}
-        params = {"locale": {"language": language}}
-        response = requests.post(
-            self.url_financial, headers=headers, files=files, params=params
-        )
-        original_response = response.json()
-
-        file_.close()
+        with open(file, "rb") as file_:
+            files = {"document": file_}
+            response = requests.post(self.url_financial, headers=headers, files=files)
+            original_response = response.json()
 
         if "document" not in original_response:
             raise ProviderException(
@@ -567,7 +551,7 @@ class MindeeApi(ProviderInterface, OcrInterface):
         )
 
     def ocr__invoice_splitter_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         with open(file, "rb") as file_:
             args = self._get_api_attributes(file_)

@@ -1,65 +1,38 @@
 {
   "original_response": {
-    "usage": {
-      "prompt_tokens": 294,
-      "completion_tokens": 294,
-      "total_tokens": 294
-    },
-    "data": [
+    "id": "chatcmpl-8c03f5b3-490c-4176-9ca6-060588a340ee",
+    "created": 1738319559,
+    "model": "gemini-1.5-flash",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
       {
-        "candidates": [
-          {
-            "content": {
-              "role": "model",
-              "parts": [
-                {
-                  "text": " The image shows a wooden walkway through a lush green marsh. The sky is a clear blue with white clouds. The marsh is full of tall grass."
-                }
-              ]
-            },
-            "finishReason": "STOP",
-            "safetyRatings": [
-              {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "probability": "NEGLIGIBLE",
-                "probabilityScore": 0.01802074,
-                "severity": "HARM_SEVERITY_NEGLIGIBLE",
-                "severityScore": 0.065604836
-              },
-              {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "probability": "NEGLIGIBLE",
-                "probabilityScore": 0.06717858,
-                "severity": "HARM_SEVERITY_NEGLIGIBLE",
-                "severityScore": 0.08977328
-              },
-              {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "probability": "NEGLIGIBLE",
-                "probabilityScore": 0.03825006,
-                "severity": "HARM_SEVERITY_NEGLIGIBLE",
-                "severityScore": 0.05291181
-              },
-              {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "probability": "NEGLIGIBLE",
-                "probabilityScore": 0.056652427,
-                "severity": "HARM_SEVERITY_NEGLIGIBLE",
-                "severityScore": 0.048948623
-              }
-            ]
-          }
-        ],
-        "usageMetadata": {
-          "promptTokenCount": 264,
-          "candidatesTokenCount": 30,
-          "totalTokenCount": 294
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "Ahoy, matey!  Shiver me timbers, that there's a picture of a fine wooden boardwalk cuttin' through a field o' tall, green grass under a sky as blue as a mermaid's eye!  The sun be shinin' bright, and there ain't a cloud in sight, except for a few fluffy ones driftin' lazily about.  Looks like a peaceful spot fer a stroll, aye?  Avast ye, and enjoy the view!\n",
+          "role": "assistant",
+          "tool_calls": null,
+          "function_call": null
         }
       }
-    ]
+    ],
+    "provider_time": 2260240979,
+    "edenai_time": null,
+    "usage": {
+      "completion_tokens": 101,
+      "prompt_tokens": 270,
+      "total_tokens": 371,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": null
+    },
+    "vertex_ai_grounding_metadata": [],
+    "vertex_ai_safety_results": [],
+    "vertex_ai_citation_metadata": [],
+    "cost": 5.0549999999999995e-05
   },
   "standardized_response": {
-    "generated_text": " The image shows a wooden walkway through a lush green marsh. The sky is a clear blue with white clouds. The marsh is full of tall grass.",
+    "generated_text": "Ahoy, matey!  Shiver me timbers, that there's a picture of a fine wooden boardwalk cuttin' through a field o' tall, green grass under a sky as blue as a mermaid's eye!  The sun be shinin' bright, and there ain't a cloud in sight, except for a few fluffy ones driftin' lazily about.  Looks like a peaceful spot fer a stroll, aye?  Avast ye, and enjoy the view!\n",
     "messages": [
       {
         "role": "user",
@@ -79,7 +52,7 @@
               "media_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
               "media_base64": null,
               "text": null,
-              "media_type": null
+              "media_type": "image/jpeg"
             }
           }
         ]
@@ -92,12 +65,19 @@
             "content": {
               "media_url": null,
               "media_base64": null,
-              "text": " The image shows a wooden walkway through a lush green marsh. The sky is a clear blue with white clouds. The marsh is full of tall grass.",
+              "text": "Ahoy, matey!  Shiver me timbers, that there's a picture of a fine wooden boardwalk cuttin' through a field o' tall, green grass under a sky as blue as a mermaid's eye!  The sun be shinin' bright, and there ain't a cloud in sight, except for a few fluffy ones driftin' lazily about.  Looks like a peaceful spot fer a stroll, aye?  Avast ye, and enjoy the view!\n",
               "media_type": null
             }
           }
         ]
       }
     ]
+  },
+  "usage": {
+    "completion_tokens": 101,
+    "prompt_tokens": 270,
+    "total_tokens": 371,
+    "completion_tokens_details": null,
+    "prompt_tokens_details": null
   }
 }

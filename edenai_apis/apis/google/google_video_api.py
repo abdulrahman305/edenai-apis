@@ -1,17 +1,26 @@
+import base64
+import json
+import mimetypes
+from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
-from time import time
-from typing import List
+from time import sleep, time
+from typing import Any, Dict, List, Optional
 
+import requests
+from dateutil.parser import parse
 from google.cloud import videointelligence
 
 from edenai_apis.apis.google.google_helpers import (
-    GoogleVideoFeatures,
+    calculate_usage_tokens,
     google_video_get_job,
     score_to_content,
 )
 from edenai_apis.features.video import (
     ContentNSFW,
     ExplicitContentDetectionAsyncDataClass,
+    QuestionAnswerAsyncDataClass,
+    QuestionAnswerDataClass,
 )
 from edenai_apis.features.video.face_detection_async.face_detection_async_dataclass import (
     FaceAttributes,
@@ -50,19 +59,35 @@ from edenai_apis.features.video.person_tracking_async.person_tracking_async_data
     VideoTrackingBoundingBox,
     VideoTrackingPerson,
 )
+from edenai_apis.features.video.shot_change_detection_async.shot_change_detection_async_dataclass import (
+    ShotChangeDetectionAsyncDataClass,
+    ShotFrame,
+)
 from edenai_apis.features.video.text_detection_async.text_detection_async_dataclass import (
     TextDetectionAsyncDataClass,
     VideoText,
     VideoTextBoundingBox,
     VideoTextFrames,
 )
+from edenai_apis.features.video.generation_async.generation_async_dataclass import (
+    GenerationAsyncDataClass,
+)
 from edenai_apis.features.video.video_interface import VideoInterface
-from edenai_apis.utils.exception import ProviderException
+from edenai_apis.utils.exception import (
+    ProviderException,
+    AsyncJobException,
+    AsyncJobExceptionReason,
+)
 from edenai_apis.utils.types import (
     AsyncBaseResponseType,
     AsyncLaunchJobResponseType,
     AsyncPendingResponseType,
     AsyncResponseType,
+    ResponseType,
+)
+from edenai_apis.utils.upload_s3 import (
+    USER_PROCESS,
+    upload_file_bytes_to_s3,
 )
 
 
@@ -86,9 +111,55 @@ class GoogleVideoApi(VideoInterface):
 
         return gcs_uri
 
+    def _is_older_than_3_hours(self, create_time: str) -> bool:
+        created_at = parse(create_time)
+        current_time = datetime.now(timezone.utc)
+        time_diff = current_time - created_at
+        hours_diff = time_diff.total_seconds() / 3600
+
+        return hours_diff > 3
+
+    def _check_file_status(self, file_uri: str, api_key: str) -> Dict[str, Any]:
+        url = f"{file_uri}?key={api_key}"
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise ProviderException(message=response.text, code=response.status_code)
+        try:
+            response_json = response.json()
+        except json.JSONDecodeError as exc:
+            raise ProviderException(
+                "An error occurred while parsing the response."
+            ) from exc
+        return response_json
+
+    def _upload_and_process_file(self, file: str, api_key: str) -> Dict[str, Any]:
+        upload_url = f"https://generativelanguage.googleapis.com/upload/v1beta/files?key={api_key}"
+
+        with open(file, "rb") as video_file:
+            file = {"file": video_file}
+            response = requests.post(upload_url, files=file)
+
+        if response.status_code != 200:
+            raise ProviderException(message=response.text, code=response.status_code)
+        try:
+            file_data = response.json()["file"]
+        except json.JSONDecodeError as exc:
+            raise ProviderException(
+                "An error occurred while parsing the response."
+            ) from exc
+
+        return file_data
+
+    def delete_file(self, file: str, api_key: str):
+        delete_url = (
+            f"https://generativelanguage.googleapis.com/v1beta/{file}?key={api_key}"
+        )
+        # don't throw error, delete should be able to fail gracefully
+        requests.delete(url=delete_url)
+
     # Launch label detection job
     def video__label_detection_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
         operation = self.clients["video"].annotate_video(
@@ -101,7 +172,7 @@ class GoogleVideoApi(VideoInterface):
 
     # Launch text detection job
     def video__text_detection_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
         operation = self.clients["video"].annotate_video(
@@ -115,7 +186,7 @@ class GoogleVideoApi(VideoInterface):
 
     # Launch face detection job
     def video__face_detection_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
 
@@ -135,7 +206,7 @@ class GoogleVideoApi(VideoInterface):
 
     # Launch person tracking job
     def video__person_tracking_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
         # Configure the request for each feature
@@ -158,7 +229,7 @@ class GoogleVideoApi(VideoInterface):
 
     # Launch logo detection job
     def video__logo_detection_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
         # Configure the request for each feature
@@ -174,7 +245,7 @@ class GoogleVideoApi(VideoInterface):
 
     # Launch object tracking job
     def video__object_tracking_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
         # Configure the request for each feature
@@ -190,7 +261,7 @@ class GoogleVideoApi(VideoInterface):
 
     # Launch explicit content detection job
     def video__explicit_content_detection_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         gcs_uri = self.google_upload_video(file=file)
         # Configure the request for each feature
@@ -202,6 +273,19 @@ class GoogleVideoApi(VideoInterface):
         )
 
         # Return job id (operation name)
+        return AsyncLaunchJobResponseType(provider_job_id=operation.operation.name)
+
+    def video__shot_change_detection_async__launch_job(
+        self, file: str, file_url: str = "", **kwargs
+    ) -> AsyncLaunchJobResponseType:
+        gcs_uri = self.google_upload_video(file=file)
+        operation = self.clients["video"].annotate_video(
+            request={
+                "features": [videointelligence.Feature.SHOT_CHANGE_DETECTION],
+                "input_uri": gcs_uri,
+            }
+        )
+
         return AsyncLaunchJobResponseType(provider_job_id=operation.operation.name)
 
     def video__label_detection_async__get_job_result(
@@ -446,10 +530,11 @@ class GoogleVideoApi(VideoInterface):
                             # Landmarks
                             landmark_output = {}
                             for land in time_stamped_object.get("landmarks", []):
-                                landmark_output[land["name"]] = [
-                                    land["point"]["x"],
-                                    land["point"]["y"],
-                                ]
+                                if landmark_name := land.get("name"):
+                                    landmark_output[landmark_name] = [
+                                        land["point"]["x"],
+                                        land["point"]["y"],
+                                    ]
                             landmark_tracking = PersonLandmarks(
                                 nose=landmark_output.get("nose", []),
                                 eye_left=landmark_output.get("left_eye", []),
@@ -647,3 +732,288 @@ class GoogleVideoApi(VideoInterface):
         return AsyncPendingResponseType[ExplicitContentDetectionAsyncDataClass](
             status="pending", provider_job_id=provider_job_id
         )
+
+    def video__shot_change_detection_async__get_job_result(
+        self, provider_job_id: str
+    ) -> AsyncBaseResponseType[ShotChangeDetectionAsyncDataClass]:
+
+        result = google_video_get_job(provider_job_id)
+        if result.get("done"):
+            response = result["response"]["annotationResults"][0]
+            shot_annotations = response.get("shotAnnotations", [])
+            shots = []
+            for shot in shot_annotations:
+                start = float(shot["startTimeOffset"][:-1])
+                end = float(shot["endTimeOffset"][:-1])
+                shots.append(ShotFrame(startTimeOffset=start, endTimeOffset=end))
+            standardized_response = ShotChangeDetectionAsyncDataClass(
+                shotAnnotations=shots
+            )
+
+            return AsyncResponseType[ShotChangeDetectionAsyncDataClass](
+                status="succeeded",
+                original_response=result["response"],
+                standardized_response=standardized_response,
+                provider_job_id=provider_job_id,
+            )
+
+        return AsyncPendingResponseType[ShotChangeDetectionAsyncDataClass](
+            status="pending", provider_job_id=provider_job_id
+        )
+
+    def _bytes_to_mega(self, bytes_value):
+        return bytes_value / (1024 * 1024)
+
+    def request_question_answer(
+        self, model, api_key, text, temperature, file_data, max_tokens=None
+    ):
+        base_url = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        url = base_url.format(model=model, api_key=api_key)
+        generation_config = {"candidateCount": 1, "temperature": temperature}
+        if max_tokens is not None:
+            generation_config["maxOutputTokens"] = max_tokens
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": text},
+                        {
+                            "file_data": {
+                                "mime_type": file_data["mimeType"],
+                                "file_uri": file_data["uri"],
+                            }
+                        },
+                    ]
+                }
+            ],
+            "generationConfig": generation_config,
+        }
+        response = requests.post(url, json=payload)
+        try:
+            original_response = response.json()
+        except json.JSONDecodeError as exc:
+            self.delete_file(file=file_data["name"], api_key=api_key)
+            raise ProviderException(
+                "An error occurred while parsing the response."
+            ) from exc
+
+        if response.status_code != 200:
+            self.delete_file(file=file_data["name"], api_key=api_key)
+            raise ProviderException(
+                message=original_response["error"]["message"],
+                code=response.status_code,
+            )
+        try:
+            generated_text = original_response["candidates"][0]["content"]["parts"][0][
+                "text"
+            ]
+            finish_reason = original_response["candidates"][0]["finishReason"]
+        except KeyError as exc:
+            raise ProviderException("Provider returned empty response") from exc
+        standardized_response = QuestionAnswerAsyncDataClass(
+            answer=generated_text, finish_reason=finish_reason
+        )
+
+        calculate_usage_tokens(original_response=original_response)
+        return original_response, standardized_response
+
+    def video__question_answer(
+        self,
+        text: str,
+        file: str,
+        file_url: str = "",
+        temperature: float = 0,
+        max_tokens: int = None,
+        model: str = None,
+        **kwargs,
+    ) -> QuestionAnswerDataClass:
+        api_key = self.api_settings.get("genai_api_key")
+        file_data = self._upload_and_process_file(file, api_key)
+        file_size_mb = self._bytes_to_mega(int(file_data.get("sizeBytes", 0)))
+        if file_size_mb >= 100:
+            self.delete_file(file=file_data["name"], api_key=api_key)
+            raise ProviderException(
+                message="The video file is too large (over 100 MB). Please use the asynchronous video question answering api instead.",
+            )
+        while file_data["state"] == "PROCESSING":
+            sleep(5)
+            file_data = self._check_file_status(file_data["uri"], api_key)
+
+        original_response, standardized_output = self.request_question_answer(
+            model=model,
+            api_key=api_key,
+            text=text,
+            temperature=temperature,
+            file_data=file_data,
+            max_tokens=max_tokens,
+        )
+
+        self.delete_file(file=file_data["name"], api_key=api_key)
+        return ResponseType[QuestionAnswerDataClass](
+            original_response=original_response,
+            standardized_response=QuestionAnswerDataClass(
+                answer=standardized_output.answer,
+                finish_reason=standardized_output.finish_reason,
+            ),
+        )
+
+    def video__question_answer_async__launch_job(
+        self,
+        text: str,
+        file: str,
+        file_url: str = "",
+        temperature: float = 0,
+        max_tokens: int = None,
+        model: str | None = None,
+        **kwargs,
+    ) -> AsyncLaunchJobResponseType:
+        data_job_id = {}
+        api_key = self.api_settings.get("genai_api_key")
+        file_data = self._upload_and_process_file(file, api_key)
+        process_file_id = file_data["name"].split("/")[1]
+
+        inputs = {
+            "text": text,
+            "temperature": temperature,
+            "model": model,
+            "max_tokens": max_tokens,
+            "process_file_id": process_file_id,
+        }
+        # HACK: serializer inputs as a job_id to be able to use them in get_job_result
+        job_id = base64.b64encode(
+            json.dumps(inputs, separators=(",", ":")).encode()
+        ).decode()
+
+        return AsyncLaunchJobResponseType(provider_job_id=job_id)
+
+    def video__question_answer_async__get_job_result(
+        self, provider_job_id: str
+    ) -> AsyncBaseResponseType:
+        api_key = self.api_settings.get("genai_api_key")
+        inputs = json.loads(base64.b64decode(provider_job_id))
+        process_file_id = inputs["process_file_id"]
+        url = f"https://generativelanguage.googleapis.com/v1beta/files/{process_file_id}?key={api_key}"
+        response = requests.get(url=url)
+        if response.status_code == 403:
+            raise AsyncJobException(
+                reason=AsyncJobExceptionReason.DEPRECATED_JOB_ID, code=403
+            )
+        if response.status_code != 200:
+            raise ProviderException(message=response.text, code=response.status_code)
+        try:
+            file_data = response.json()
+        except json.JSONDecodeError as exc:
+            raise ProviderException(
+                "An error occurred while parsing the response."
+            ) from exc
+        if file_data["state"] == "PROCESSING":
+            return AsyncPendingResponseType[QuestionAnswerAsyncDataClass](
+                status="pending", provider_job_id=provider_job_id
+            )
+        else:
+            original_response, standardized_response = self.request_question_answer(
+                model=inputs["model"],
+                api_key=api_key,
+                text=inputs["text"],
+                temperature=inputs["temperature"],
+                file_data=file_data,
+                max_tokens=inputs["max_tokens"],
+            )
+            self.delete_file(file=file_data["name"], api_key=api_key)
+            return AsyncResponseType[QuestionAnswerAsyncDataClass](
+                original_response=original_response,
+                standardized_response=standardized_response,
+                provider_job_id=provider_job_id,
+            )
+
+    def video__generation_async__launch_job(
+        self,
+        text: str,
+        duration: Optional[int] = 6,
+        fps: Optional[int] = 24,
+        dimension: Optional[str] = "1280x720",
+        seed: Optional[float] = 12,
+        file: Optional[str] = None,
+        file_url: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncLaunchJobResponseType:
+        api_key = self.api_settings.get("genai_api_key")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:predictLongRunning?key={api_key}"
+        prompt = {"prompt": text}
+        params = {
+        }
+        is_veo2 = True if "veo-2.0-generate-001" in model else False
+        if is_veo2:
+            if file:
+                with open(file, "rb") as file_:
+                    file_content = file_.read()
+                    input_image_base64 = base64.b64encode(file_content).decode("utf-8")
+                    mime_type = mimetypes.guess_type(file)[0]
+                    image = {
+                        "bytesBase64Encoded": input_image_base64,
+                        "mimeType": mime_type,
+                    }
+                    prompt["image"] = image
+                    params["durationSeconds"] = duration
+
+        payload = {
+            "instances": [prompt],
+            "parameters": params,
+        }
+        response = requests.post(url=url, json=payload)
+        try:
+            original_response = response.json()
+        except json.JSONDecodeError as exc:
+            raise ProviderException(
+                "An error occurred while parsing the response."
+            ) from exc
+
+        if response.status_code != 200:
+            raise ProviderException(
+                message=original_response["error"]["message"],
+                code=response.status_code,
+            )
+        # {'name': 'models/veo-2.0-generate-001/operations/0gbm5qefte2y'}
+
+        provider_job_id = original_response["name"]
+        return AsyncLaunchJobResponseType(provider_job_id=provider_job_id)
+
+    def video__generation_async__get_job_result(
+        self, provider_job_id: str
+    ) -> GenerationAsyncDataClass:
+        api_key = self.api_settings.get("genai_api_key")
+        url = f"https://generativelanguage.googleapis.com/v1beta/{provider_job_id}?key={api_key}"
+        response = requests.get(url)
+        try:
+            original_response = response.json()
+        except json.JSONDecodeError as exc:
+            raise ProviderException(
+                "An error occurred while parsing the response."
+            ) from exc
+        if "error" in original_response:
+            raise ProviderException(
+                message=original_response["error"]["message"],
+                code=original_response["error"]["code"],
+            )
+        if original_response.get("done") is True:
+            uri = original_response["response"]["generateVideoResponse"][
+                "generatedSamples"
+            ][0]["video"]["uri"]
+            headers = {"x-goog-api-key": api_key}
+            response = requests.get(uri, headers=headers)
+            file_content = response.content
+            base64_encoded_string = base64.b64encode(file_content).decode("utf-8")
+            resource_url = upload_file_bytes_to_s3(
+                BytesIO(file_content), ".mp4", USER_PROCESS
+            )
+            standardized_response = GenerationAsyncDataClass(
+                video=base64_encoded_string, video_resource_url=resource_url
+            )
+            return AsyncResponseType[GenerationAsyncDataClass](
+                original_response=original_response,
+                standardized_response=standardized_response,
+                provider_job_id=provider_job_id,
+            )
+
+        return AsyncPendingResponseType(provider_job_id=provider_job_id)

@@ -52,37 +52,38 @@ class FaceppApi(ProviderInterface, ImageInterface):
                 data={**self.api_settings, "image_url": file_url},
             )
         else:
-            response = requests.post(
-                f"{self.base_url}/detect",
-                data=self.api_settings,
-                files={"image_file": open(file, "rb")},
-            )
+            with open(file, "rb") as f:
+                response = requests.post(
+                    f"{self.base_url}/detect",
+                    data=self.api_settings,
+                    files={"image_file": f},
+                )
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
         return [face["face_token"] for face in original_response["faces"]]
 
     def image__face_recognition__create_collection(
-        self, collection_id: str
+        self, collection_id: str, **kwargs
     ) -> FaceRecognitionCreateCollectionDataClass:
         payload = {**self.api_settings, "outer_id": collection_id}
         response = requests.post(f"{self.base_url}/faceset/create", data=payload)
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         return FaceRecognitionCreateCollectionDataClass(
             collection_id=response.json()["outer_id"]
         )
 
     def image__face_recognition__list_collections(
-        self,
+        self, **kwargs
     ) -> ResponseType[FaceRecognitionListCollectionsDataClass]:
         response = requests.post(
             f"{self.base_url}/faceset/getfacesets", data=self.api_settings
         )
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
         collections = [faceset["outer_id"] for faceset in original_response["facesets"]]
@@ -94,13 +95,13 @@ class FaceppApi(ProviderInterface, ImageInterface):
         )
 
     def image__face_recognition__delete_collection(
-        self, collection_id: str
+        self, collection_id: str, **kwargs
     ) -> ResponseType[FaceRecognitionDeleteCollectionDataClass]:
         payload = {**self.api_settings, "outer_id": collection_id, "check_empty": 0}
 
         response = requests.post(f"{self.base_url}/faceset/delete", data=payload)
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
         return ResponseType(
@@ -111,7 +112,7 @@ class FaceppApi(ProviderInterface, ImageInterface):
         )
 
     def image__face_recognition__add_face(
-        self, collection_id: str, file: str, file_url: Optional[str] = None
+        self, collection_id: str, file: str, file_url: Optional[str] = None, **kwargs
     ) -> ResponseType[FaceRecognitionAddFaceDataClass]:
         faces_tokens = self._get_face_tokens(file, file_url)
 
@@ -128,7 +129,7 @@ class FaceppApi(ProviderInterface, ImageInterface):
 
         response = requests.post(f"{self.base_url}/faceset/addface", data=payload)
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
         return ResponseType(
@@ -139,13 +140,13 @@ class FaceppApi(ProviderInterface, ImageInterface):
         )
 
     def image__face_recognition__list_faces(
-        self, collection_id: str
+        self, collection_id: str, **kwargs
     ) -> ResponseType[FaceRecognitionListFacesDataClass]:
         payload = {**self.api_settings, "outer_id": collection_id}
 
         response = requests.post(f"{self.base_url}/faceset/getdetail", data=payload)
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
 
@@ -157,7 +158,7 @@ class FaceppApi(ProviderInterface, ImageInterface):
         )
 
     def image__face_recognition__delete_face(
-        self, collection_id, face_id
+        self, collection_id, face_id, **kwargs
     ) -> ResponseType[FaceRecognitionDeleteFaceDataClass]:
         payload = {
             **self.api_settings,
@@ -167,7 +168,7 @@ class FaceppApi(ProviderInterface, ImageInterface):
 
         response = requests.post(f"{self.base_url}/faceset/removeface", data=payload)
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
 
@@ -177,7 +178,7 @@ class FaceppApi(ProviderInterface, ImageInterface):
         )
 
     def image__face_recognition__recognize(
-        self, collection_id: str, file: str, file_url: Optional[str] = None
+        self, collection_id: str, file: str, file_url: Optional[str] = None, **kwargs
     ) -> ResponseType[FaceRecognitionRecognizeDataClass]:
         payload = {
             **self.api_settings,
@@ -188,13 +189,14 @@ class FaceppApi(ProviderInterface, ImageInterface):
                 f"{self.base_url}/search", data={"image_url": file_url, **payload}
             )
         else:
-            response = requests.post(
-                f"{self.base_url}/search",
-                data=payload,
-                files={"image_file": open(file, "rb")},
-            )
+            with open(file, "rb") as f:
+                response = requests.post(
+                    f"{self.base_url}/search",
+                    data=payload,
+                    files={"image_file": f},
+                )
         if not response.ok:
-            raise ProviderException(response.text, code = response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
         found_faces = original_response.get("results", [])
@@ -216,6 +218,7 @@ class FaceppApi(ProviderInterface, ImageInterface):
         file2: str,
         file1_url: Optional[str] = None,
         file2_url: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[FaceCompareDataClass]:
         url = self.base_url + "/compare"
         if file1_url and file2_url:
@@ -226,16 +229,17 @@ class FaceppApi(ProviderInterface, ImageInterface):
             }
             response = requests.post(url, data=payload)
         else:
-            response = requests.post(
-                url=url,
-                data=self.api_settings,
-                files={
-                    "image_file1": open(file1, "rb"),
-                    "image_file2": open(file2, "rb"),
-                },
-            )
+            with open(file1, "rb") as f1, open(file2, "rb") as f2:
+                response = requests.post(
+                    url=url,
+                    data=self.api_settings,
+                    files={
+                        "image_file1": f1,
+                        "image_file2": f2,
+                    },
+                )
         if not response.ok:
-            raise ProviderException(response.text, code= response.status_code)
+            raise ProviderException(response.text, code=response.status_code)
 
         original_response = response.json()
         faces = []

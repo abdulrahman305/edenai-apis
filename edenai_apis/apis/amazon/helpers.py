@@ -167,13 +167,14 @@ def _ocr_tables_standarize_row(row) -> Tuple[Row, int]:
 
 def _ocr_tables_standarize_cell(cell) -> Cell:
     is_header = "COLUMN_HEADER" in cell.entityTypes
+    confidence = float(cell.confidence / 100)
     return Cell(
         text=cell.mergedText,
         row_index=cell.columnIndex,
         col_index=cell.rowIndex,
         row_span=cell.rowSpan,
         col_span=cell.columnSpan,
-        confidence=cell.confidence,
+        confidence=confidence,
         is_header=is_header,
         bounding_box=BoundixBoxOCRTable(
             left=cell.geometry.boundingBox.left,
@@ -1072,3 +1073,13 @@ def amazon_video_explicit_parser(response):
             )
         )
     return moderated_content
+
+
+def get_confidence_if_true(face_data, attribute_key):
+    """
+    retrieve the confidence of a value if its true (face_detection)
+    """
+    attribute_info = face_data.get(attribute_key, {})
+    if attribute_info.get("Value") is True:
+        return attribute_info.get("Confidence", 0.0) / 100.0
+    return None

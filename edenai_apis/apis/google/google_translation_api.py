@@ -1,7 +1,7 @@
 import base64
 import mimetypes
 from io import BytesIO
-from typing import Sequence
+from typing import Sequence, Optional
 
 from google.protobuf.json_format import MessageToDict
 
@@ -25,7 +25,12 @@ from edenai_apis.utils.upload_s3 import upload_file_bytes_to_s3, USER_PROCESS
 
 class GoogleTranslationApi(TranslationInterface):
     def translation__automatic_translation(
-        self, source_language: str, target_language: str, text: str
+        self,
+        source_language: str,
+        target_language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[AutomaticTranslationDataClass]:
         # Getting response
         client = self.clients["translate"]
@@ -34,12 +39,12 @@ class GoogleTranslationApi(TranslationInterface):
         payload = {
             "parent": parent,
             "contents": [text],
-            "mime_type" : "text/plain",  # mime types: text/plain, text/html
+            "mime_type": "text/plain",  # mime types: text/plain, text/html
             "source_language_code": source_language,
-            "target_language_code": target_language
+            "target_language_code": target_language,
         }
         response = handle_google_call(client.translate_text, **payload)
-        
+
         # Analyze response
         # Getting the translated text
         data = response.translations
@@ -54,16 +59,18 @@ class GoogleTranslationApi(TranslationInterface):
         )
 
     def translation__language_detection(
-        self, text: str
+        self, text: str, model: Optional[str] = None, **kwargs
     ) -> ResponseType[LanguageDetectionDataClass]:
-        
+
         payload = {
             "parent": f"projects/{self.project_id}/locations/global",
             "content": text,
-            "mime_type": "text/plain"
+            "mime_type": "text/plain",
         }
-        response = handle_google_call(self.clients["translate"].detect_language, **payload)
-        
+        response = handle_google_call(
+            self.clients["translate"].detect_language, **payload
+        )
+
         items: Sequence[InfosLanguageDetectionDataClass] = []
         for language in response.languages:
             items.append(
@@ -87,34 +94,32 @@ class GoogleTranslationApi(TranslationInterface):
         target_language: str,
         file_type: str,
         file_url: str = "",
+        **kwargs,
     ) -> ResponseType[DocumentTranslationDataClass]:
         mimetype = mimetypes.guess_type(file)[0]
         extension = mimetypes.guess_extension(mimetype)
         client = self.clients["translate"]
         parent = f"projects/{self.project_id}/locations/global"
 
-        file_ = open(file, "rb")
-
-        document_input_config = {
-            "content": file_.read(),
-            "mime_type": file_type,
-        }
-
-        payload = {
-            "request": {
-                "parent": parent,
-                "target_language_code": target_language,
-                "source_language_code": source_language,
-                "document_input_config": document_input_config,
+        with open(file, "rb") as file_:
+            document_input_config = {
+                "content": file_.read(),
+                "mime_type": file_type,
             }
-        }
-        original_response = handle_google_call(client.translate_document, **payload)
 
-        file_bytes = original_response.document_translation.byte_stream_outputs[0]
-        file_.close()
+            payload = {
+                "request": {
+                    "parent": parent,
+                    "target_language_code": target_language,
+                    "source_language_code": source_language,
+                    "document_input_config": document_input_config,
+                }
+            }
+            original_response = handle_google_call(client.translate_document, **payload)
 
-        print(dir(original_response))
-        serialized_response = MessageToDict(original_response._pb) 
+            file_bytes = original_response.document_translation.byte_stream_outputs[0]
+
+        serialized_response = MessageToDict(original_response._pb)
 
         b64_file = base64.b64encode(file_bytes)
         resource_url = upload_file_bytes_to_s3(

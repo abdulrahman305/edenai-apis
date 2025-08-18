@@ -46,6 +46,7 @@ class GoogleAudioApi(AudioInterface):
         speaking_pitch: int,
         speaking_volume: int,
         sampling_rate: int,
+        **kwargs,
     ) -> ResponseType[TextToSpeechDataClass]:
         voice_type = 1
 
@@ -111,6 +112,7 @@ class GoogleAudioApi(AudioInterface):
         model: Optional[str] = None,
         file_url: str = "",
         provider_params: Optional[dict] = None,
+        **kwargs,
     ) -> AsyncLaunchJobResponseType:
         provider_params = provider_params or {}
         export_format, channels, _ = audio_attributes
@@ -131,13 +133,18 @@ class GoogleAudioApi(AudioInterface):
         # Launch file transcription
         client = SpeechClient()
 
+        try:
+            features = cloud_speech.RecognitionFeatures(**provider_params)
+        except ValueError as err:
+            """Wrong config are set by users"""
+            raise ProviderException(str(err), code=400)
+
         config = cloud_speech.RecognitionConfig(
             auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
             language_codes=[language],
             model=model or "long",
-            features=cloud_speech.RecognitionFeatures(**provider_params),
+            features=features,
         )
-
         file_metadata = cloud_speech.BatchRecognizeFileMetadata(uri=gcs_uri)
 
         request = cloud_speech.BatchRecognizeRequest(
@@ -148,6 +155,7 @@ class GoogleAudioApi(AudioInterface):
                 inline_response_config=cloud_speech.InlineOutputConfig(),
             ),
         )
+
         operation = handle_google_call(client.batch_recognize, request=request)
 
         operation_name = operation.operation.name

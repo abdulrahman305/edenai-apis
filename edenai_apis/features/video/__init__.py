@@ -51,3 +51,10 @@ from .text_detection_async import (
     VideoTextFrames,
     text_detection_async_arguments,
 )
+
+from .question_answer import QuestionAnswerDataClass, question_answer_arguments
+from .question_answer_async import (
+    question_answer_async_arguments,
+    QuestionAnswerAsyncDataClass,
+)
+from .generation_async import generation_async_arguments, GenerationAsyncDataClass

@@ -3,6 +3,7 @@
         "automatic_translation": {
             "constraints": {
                 "languages": [
+                    "ar",
                     "bg",
                     "zh",
                     "zh-Hant",
@@ -83,5 +84,8 @@
             },
             "version": "v2"
         }
+    },
+    "_metadata": {
+        "privacy_url": "https://www.deepl.com/en/privacy"
     }
 }

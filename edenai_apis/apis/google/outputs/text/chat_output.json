@@ -1,45 +1,58 @@
 {
   "original_response": {
-    "predictions": [
+    "id": "chatcmpl-3f5dfb72-8500-4756-9fbd-ac855028cc54",
+    "created": 1738319593,
+    "model": "gemini-1.5-pro",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
       {
-        "candidates": [
-          {
-            "content": "Barack Obama, president, united states, african american, democrat, senator, illinois",
-            "author": "bot"
-          }
-        ],
-        "citationMetadata": [
-          {
-            "citations": []
-          }
-        ],
-        "safetyAttributes": {
-          "categories": [
-            "Death, Harm & Tragedy",
-            "Politics",
-            "War & Conflict"
-          ],
-          "scores": [
-            0.1,
-            1,
-            0.1
-          ],
-          "blocked": false
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "Barack Obama, president, United States\n",
+          "role": "assistant",
+          "tool_calls": null,
+          "function_call": null
         }
       }
-    ]
+    ],
+    "provider_time": 983109025,
+    "edenai_time": null,
+    "usage": {
+      "completion_tokens": 9,
+      "prompt_tokens": 219,
+      "total_tokens": 228,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": null
+    },
+    "vertex_ai_grounding_metadata": [],
+    "vertex_ai_safety_results": [],
+    "vertex_ai_citation_metadata": [],
+    "cost": 0.000861
   },
   "standardized_response": {
-    "generated_text": "Barack Obama, president, united states, african american, democrat, senator, illinois",
+    "generated_text": "Barack Obama, president, United States\n",
     "message": [
       {
         "role": "user",
-        "message": "Barack Hussein Obama is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, Obama was the first African-American president of the United States. He previously served as a U.S. senator from Illinois from 2005 to 2008 and as an Illinois state senator from 1997 to 2004."
+        "message": "Barack Hussein Obama is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, Obama was the first African-American president of the United States. He previously served as a U.S. senator from Illinois from 2005 to 2008 and as an Illinois state senator from 1997 to 2004.",
+        "tools": null,
+        "tool_calls": null
       },
       {
         "role": "assistant",
-        "message": "Barack Obama, president, united states, african american, democrat, senator, illinois"
+        "message": "Barack Obama, president, United States\n",
+        "tools": null,
+        "tool_calls": []
       }
     ]
+  },
+  "usage": {
+    "completion_tokens": 9,
+    "prompt_tokens": 219,
+    "total_tokens": 228,
+    "completion_tokens_details": null,
+    "prompt_tokens_details": null
   }
 }

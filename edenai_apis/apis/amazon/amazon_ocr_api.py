@@ -61,10 +61,7 @@ from .helpers import (
 
 class AmazonOcrApi(OcrInterface):
     def ocr__ocr(
-        self,
-        file: str,
-        language: str,
-        file_url: str = "",
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[OcrDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -109,24 +106,25 @@ class AmazonOcrApi(OcrInterface):
         )
 
     def ocr__identity_parser(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[IdentityParserDataClass]:
-        file_ = open(file, "rb")
 
-        payload = {
-            "DocumentPages": [
-                {
-                    "Bytes": file_.read(),
-                    "S3Object": {"Bucket": self.api_settings["bucket"], "Name": "test"},
-                }
-            ]
-        }
+        with open(file, "rb") as file_:
+            payload = {
+                "DocumentPages": [
+                    {
+                        "Bytes": file_.read(),
+                        "S3Object": {
+                            "Bucket": self.api_settings["bucket"],
+                            "Name": "test",
+                        },
+                    }
+                ]
+            }
 
-        original_response = handle_amazon_call(
-            self.clients["textract"].analyze_id, **payload
-        )
-
-        file_.close()
+            original_response = handle_amazon_call(
+                self.clients["textract"].analyze_id, **payload
+            )
 
         items: Sequence[InfosIdentityParserDataClass] = []
         for document in original_response["IdentityDocuments"]:
@@ -203,7 +201,7 @@ class AmazonOcrApi(OcrInterface):
         )
 
     def ocr__ocr_tables_async__launch_job(
-        self, file: str, file_type: str, language: str, file_url: str = ""
+        self, file: str, file_type: str, language: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -278,7 +276,11 @@ class AmazonOcrApi(OcrInterface):
         )
 
     def ocr__custom_document_parsing_async__launch_job(
-        self, file: str, queries: List[Dict[str, Union[str, str]]], file_url: str = ""
+        self,
+        file: str,
+        queries: List[Dict[str, Union[str, str]]],
+        file_url: str = "",
+        **kwargs,
     ) -> AsyncLaunchJobResponseType:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -363,7 +365,7 @@ class AmazonOcrApi(OcrInterface):
         )
 
     def ocr__invoice_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[InvoiceParserDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -428,7 +430,7 @@ class AmazonOcrApi(OcrInterface):
         )
 
     def ocr__receipt_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[ReceiptParserDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -493,7 +495,7 @@ class AmazonOcrApi(OcrInterface):
         )
 
     def ocr__ocr_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -558,7 +560,7 @@ class AmazonOcrApi(OcrInterface):
         return AsyncPendingResponseType(provider_job_id=response["JobStatus"])
 
     def ocr__data_extraction(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[DataExtractionDataClass]:
         with open(file, "rb") as fstream:
             file_content = fstream.read()
@@ -623,7 +625,13 @@ class AmazonOcrApi(OcrInterface):
             )
 
     def ocr__financial_parser(
-        self, file: str, language: str, document_type: str, file_url: str = ""
+        self,
+        file: str,
+        language: str,
+        document_type: str,
+        file_url: str = "",
+        model: str = None,
+        **kwargs,
     ) -> ResponseType[FinancialParserDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()

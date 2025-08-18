@@ -1,8 +1,8 @@
 import base64
 import json
-from typing import Sequence, Optional, BinaryIO, Dict
-
+from typing import Sequence, Optional
 import numpy as np
+import mimetypes
 import requests
 from PIL import Image as Img, UnidentifiedImageError
 from google.cloud import vision
@@ -54,7 +54,12 @@ from edenai_apis.features.image.object_detection.object_detection_dataclass impo
 )
 from edenai_apis.features.image.question_answer import QuestionAnswerDataClass
 from edenai_apis.utils.exception import ProviderException
+from edenai_apis.utils.parsing import extract
 from edenai_apis.utils.types import ResponseType
+from edenai_apis.features.image.embeddings import (
+    EmbeddingsDataClass,
+    EmbeddingDataClass,
+)
 
 
 class GoogleImageApi(ImageInterface):
@@ -63,7 +68,7 @@ class GoogleImageApi(ImageInterface):
         return values[value]
 
     def image__explicit_content(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: Optional[str] = None, **kwargs
     ) -> ResponseType[ExplicitContentDataClass]:
         with open(file, "rb") as file_:
             content = file_.read()
@@ -111,18 +116,17 @@ class GoogleImageApi(ImageInterface):
         )
 
     def image__object_detection(
-        self, file: str, model: str = None, file_url: str = ""
+        self, file: str, model: str = None, file_url: str = "", **kwargs
     ) -> ResponseType[ObjectDetectionDataClass]:
-        file_ = open(file, "rb")
-        image = vision.Image(content=file_.read())
+        with open(file, "rb") as file_:
+            image = vision.Image(content=file_.read())
 
-        payload = {"image": image}
-        response = handle_google_call(
-            self.clients["image"].object_localization, **payload
-        )
-        response = MessageToDict(response._pb)
+            payload = {"image": image}
+            response = handle_google_call(
+                self.clients["image"].object_localization, **payload
+            )
+            response = MessageToDict(response._pb)
 
-        file_.close()
         items = []
         for object_annotation in response.get("localizedObjectAnnotations", []):
             x_min, x_max = np.infty, -np.infty
@@ -154,7 +158,7 @@ class GoogleImageApi(ImageInterface):
         )
 
     def image__face_detection(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[FaceDetectionDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -295,7 +299,7 @@ class GoogleImageApi(ImageInterface):
         )
 
     def image__landmark_detection(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[LandmarkDetectionDataClass]:
         with open(file, "rb") as file_:
             content = file_.read()
@@ -344,7 +348,7 @@ class GoogleImageApi(ImageInterface):
         )
 
     def image__logo_detection(
-        self, file: str, file_url: str = "", model: str = None
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[LogoDetectionDataClass]:
         with open(file, "rb") as file_:
             content = file_.read()
@@ -383,155 +387,90 @@ class GoogleImageApi(ImageInterface):
             standardized_response=LogoDetectionDataClass(items=items),
         )
 
-    def _imagen_qa(
-        self,
-        fstream: BinaryIO,
-        question: str,
-        headers: Dict[str, str],
-        location: str = "us-central1",
-    ) -> ResponseType[QuestionAnswerDataClass]:
-        url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{self.project_id}/locations/{location}/publishers/google/models/imagetext:predict"
-        payload = {
-            "instances": [
-                {
-                    "prompt": question or "Describe the image",
-                    "image": {
-                        "bytesBase64Encoded": base64.b64encode(fstream.read()).decode(
-                            "utf-8"
-                        )
-                    },
-                }
-            ],
-            "parameters": {
-                "sampleCount": 3,
-            },
-        }
-
-        response = requests.post(url, json=payload, headers=headers)
-
-        try:
-            original_response = response.json()
-        except json.JSONDecodeError as exc:
-            raise ProviderException(
-                message="Internal Server Error",
-                code=500,
-            ) from exc
-
-        if "error" in original_response:
-            raise ProviderException(
-                message=original_response["error"]["message"], code=400
-            )
-
-        if not original_response.get("predictions"):
-            raise ProviderException(message="No predictions found", code=400)
-
-        standardized_response = QuestionAnswerDataClass(
-            answers=original_response["predictions"],
-        )
-
-        return ResponseType[QuestionAnswerDataClass](
-            original_response=original_response,
-            standardized_response=standardized_response,
-        )
-
-    def _gemini_pro_vision_qa(
-        self,
-        fstream: BinaryIO,
-        question: str,
-        temperature: float,
-        max_tokens: int,
-        header: Dict[str, str],
-        location: str = "us-central1",
-    ):
-        url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{self.project_id}/locations/{location}/publishers/google/models/gemini-pro-vision:streamGenerateContent"
-
-        payload = {
-            "contents": {
-                "role": "USER",
-                "parts": [
-                    {
-                        "inlineData": {
-                            "data": base64.b64encode(fstream.read()).decode("utf-8"),
-                            "mimeType": "image/png",
-                        }
-                    },
-                    {
-                        "text": question,
-                    },
-                ],
-            },
-            "generationConfig": {
-                "candidateCount": 1,
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens,
-            },
-        }
-
-        response = requests.post(url, json=payload, headers=header)
-
-        try:
-            original_response = response.json()
-        except json.JSONDecodeError as exc:
-            raise ProviderException(
-                message="Internal Server Error",
-                code=500,
-            ) from exc
-
-        answer = ""
-
-        for i in range(len(original_response)):
-            if original_response[i].get("error") is not None:
-                raise ProviderException(
-                    message=original_response["error"]["message"], code=400
-                )
-
-            if (
-                not original_response[i].get("candidates")
-                or len(original_response[i].get("candidates", [])) < 1
-            ):
-                raise ProviderException(message="No predictions found", code=400)
-            answer += (
-                original_response[i]["candidates"][0]
-                .get("content", {})
-                .get("parts", [{}])[0]
-                .get("text", "")
-            )
-
-        standardized_response = QuestionAnswerDataClass(
-            answers=[answer],
-        )
-
-        return ResponseType[QuestionAnswerDataClass](
-            original_response=original_response,
-            standardized_response=standardized_response,
-        )
-
     def image__question_answer(
         self,
         file: str,
         temperature: float,
         max_tokens: int,
         file_url: str = "",
-        model: Optional[str] = "gemini-pro-vision",
+        model: Optional[str] = None,
         question: Optional[str] = None,
         settings: Optional[dict] = None,
+        **kwargs,
     ) -> ResponseType[QuestionAnswerDataClass]:
         with open(file, "rb") as fstream:
-            token = get_access_token(self.location)
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
+            file_content = fstream.read()
+            file_b64 = base64.b64encode(file_content).decode("utf-8")
+        mime_type = mimetypes.guess_type(file)[0]
+        image_data = f"data:{mime_type};base64,{file_b64}"
+        response = self.clients["llm_client"].image_qa(
+            image_data=image_data,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            model=model,
+            question=question,
+        )
+        return response
+
+    def image__embeddings(
+        self,
+        file: Optional[str],
+        representation: Optional[str] = "image",
+        model: Optional[str] = "multimodalembedding@001",
+        embedding_dimension: int = 1408,
+        file_url: Optional[str] = "",
+        **kwargs,
+    ) -> ResponseType[EmbeddingsDataClass]:
+
+        token = get_access_token(self.location)
+        location = "us-central1"
+        url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{self.project_id}/locations/{location}/publishers/google/models/{model}:predict"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+
+        with open(file, "rb") as file_:
+            content = file_.read()
+            payload = {
+                "instances": [
+                    {
+                        "image": {
+                            "bytesBase64Encoded": base64.b64encode(content).decode(
+                                "utf-8"
+                            )
+                        }
+                    }
+                ],
+                "parameters": {"dimension": embedding_dimension},
             }
-            if question is None:
-                question = "Describe the image"
-            if model == "imagen":
-                return self._imagen_qa(fstream, question, headers)
-            elif model == "gemini-pro-vision":
-                return self._gemini_pro_vision_qa(
-                    fstream, question, temperature, max_tokens, headers
-                )
-            else:
+
+            response = requests.post(url, json=payload, headers=headers)
+            try:
+                original_response = response.json()
+            except json.JSONDecodeError as exc:
                 raise ProviderException(
-                    message="Model not found",
-                    code=400,
+                    message="Internal Server Error",
+                    code=500,
+                ) from exc
+
+            if "error" in original_response:
+                raise ProviderException(
+                    message=original_response["error"]["message"], code=400
                 )
+
+            if not original_response.get("predictions"):
+                raise ProviderException(message="No predictions found", code=400)
+
+            items: Sequence[EmbeddingDataClass] = []
+
+            for prediction in original_response["predictions"]:
+                embedding = prediction.get("imageEmbedding") or []
+                items.append(EmbeddingDataClass(embedding=embedding))
+
+            standardized_response = EmbeddingsDataClass(items=items)
+
+            return ResponseType[EmbeddingsDataClass](
+                original_response=original_response,
+                standardized_response=standardized_response,
+            )

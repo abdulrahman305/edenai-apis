@@ -1,0 +1,12 @@
+{
+    "image": {
+        "generation": {
+            "version": "v3"
+        }
+    },
+    "video": {
+        "generation_async": {
+            "version": "v3"
+        }
+    }
+}

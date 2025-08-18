@@ -1,9 +1,9 @@
 """
-    Test interface functions :
-    - compute_output
-    - list_features
-    - list_providers
-    - check_provider_constraints
+Test interface functions :
+- compute_output
+- list_features
+- list_providers
+- check_provider_constraints
 """
 
 import pytest
@@ -12,6 +12,7 @@ from pytest_mock import MockerFixture
 from edenai_apis.interface import (
     check_provider_constraints,
     compute_output,
+    acompute_output,
     list_features,
     list_providers,
 )
@@ -27,16 +28,37 @@ VALID_SUBFEATURE = "text_to_speech"
     global_features(return_phase=True)["ungrouped_providers"],
 )
 class TestComputeOutput:
+    @pytest.mark.integration
     def test_output_fake(
         self, mocker: MockerFixture, provider, feature, subfeature, phase
     ):
         if phase == "create_project":
             pytest.skip("create_project is not supported in fake mode")
+        if subfeature in ["achat"]:
+            pytest.skip("achat is an async feature, we test it in async tests")
         mocker.patch(
             "edenai_apis.interface.validate_all_provider_constraints", return_value={}
         )
         final_result = compute_output(
             provider, feature, subfeature, {}, fake=True, phase=phase
+        )
+        assert final_result["provider"] == provider
+        assert final_result["status"] == "success"
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_async_output_fake(
+        self, mocker: MockerFixture, provider, feature, subfeature, phase
+    ):
+        if subfeature not in ["achat"]:
+            pytest.skip("we test async features only with achat")
+        if phase == "create_project":
+            pytest.skip("create_project is not supported in fake mode")
+        mocker.patch(
+            "edenai_apis.interface.validate_all_provider_constraints", return_value={}
+        )
+        final_result = await acompute_output(
+            provider, feature, subfeature, {}, fake=True, phase=phase, D=True
         )
         assert final_result["provider"] == provider
         assert final_result["status"] == "success"
@@ -47,6 +69,7 @@ class TestComputeOutput:
     global_features(filter=only_async, return_phase=True)["ungrouped_providers"],
 )
 class TestGetAsyncJobResult:
+    @pytest.mark.integration
     def test_output_fake(
         self, mocker: MockerFixture, provider, feature, subfeature, phase
     ):
@@ -60,6 +83,7 @@ class TestGetAsyncJobResult:
         assert final_result["status"] == "success"
 
 
+@pytest.mark.integration
 def test_list_features():
     # with a list as return
     method_list = list_features()
@@ -89,6 +113,7 @@ def test_list_features():
                 assert method_dict[provider][feature][subfeature]
 
 
+@pytest.mark.unit
 def test_list_providers():
     # all providers
     providers = list_providers()
@@ -117,6 +142,7 @@ def test_list_providers():
     )
 
 
+@pytest.mark.unit
 def test_check_provider_constraints():
     assert check_provider_constraints(VALID_PROVIDER, VALID_FEATURE, VALID_SUBFEATURE)[
         0

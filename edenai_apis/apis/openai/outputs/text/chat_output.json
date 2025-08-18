@@ -1,39 +1,73 @@
 {
   "original_response": {
-    "id": "chatcmpl-8KS3Mz2wmYGqUcfncF0ymjAUxozUH",
+    "id": "chatcmpl-AxWjrfbAaVo4lwTPDHxeDzhp7ceRq",
+    "created": 1738750563,
+    "model": "gpt-3.5-turbo-0125",
     "object": "chat.completion",
-    "created": 1699885088,
-    "model": "gpt-4-1106-vision-preview",
-    "usage": {
-      "prompt_tokens": 222,
-      "completion_tokens": 25,
-      "total_tokens": 247
-    },
+    "system_fingerprint": null,
     "choices": [
       {
+        "finish_reason": "stop",
+        "index": 0,
         "message": {
+          "content": "barack hussein obama, american, politician, 44th president, united states, democratic party, african-american, u.s. senator, illinois, state senator",
           "role": "assistant",
-          "content": "Barack Hussein Obama, American, politician, president, United States, Democratic Party, African-American, senator, Illinois, state"
-        },
-        "finish_details": {
-          "type": "stop",
-          "stop": "<|fim_suffix|>"
-        },
-        "index": 0
+          "tool_calls": null,
+          "function_call": null,
+          "refusal": null
+        }
       }
-    ]
+    ],
+    "provider_time": 1548956805,
+    "edenai_time": null,
+    "usage": {
+      "completion_tokens": 37,
+      "prompt_tokens": 222,
+      "total_tokens": 259,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "service_tier": "default",
+    "cost": 0.0001665
   },
   "standardized_response": {
-    "generated_text": "Barack Hussein Obama, American, politician, president, United States, Democratic Party, African-American, senator, Illinois, state",
+    "generated_text": "barack hussein obama, american, politician, 44th president, united states, democratic party, african-american, u.s. senator, illinois, state senator",
     "message": [
       {
         "role": "user",
-        "message": "Barack Hussein Obama is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, Obama was the first African-American president of the United States. He previously served as a U.S. senator from Illinois from 2005 to 2008 and as an Illinois state senator from 1997 to 2004."
+        "message": "Barack Hussein Obama is an American politician who served as the 44th president of the United States from 2009 to 2017. A member of the Democratic Party, Obama was the first African-American president of the United States. He previously served as a U.S. senator from Illinois from 2005 to 2008 and as an Illinois state senator from 1997 to 2004.",
+        "tools": null,
+        "tool_calls": null
       },
       {
         "role": "assistant",
-        "message": "Barack Hussein Obama, American, politician, president, United States, Democratic Party, African-American, senator, Illinois, state"
+        "message": "barack hussein obama, american, politician, 44th president, united states, democratic party, african-american, u.s. senator, illinois, state senator",
+        "tools": null,
+        "tool_calls": []
       }
     ]
+  },
+  "usage": {
+    "completion_tokens": 37,
+    "prompt_tokens": 222,
+    "total_tokens": 259,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
   }
 }

@@ -4,7 +4,7 @@ import json
 import mimetypes
 from io import BytesIO
 from time import sleep
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 
@@ -37,7 +37,12 @@ class DeeplApi(ProviderInterface, TranslationInterface):
         }
 
     def translation__automatic_translation(
-        self, source_language: str, target_language: str, text: str
+        self,
+        source_language: str,
+        target_language: str,
+        text: str,
+        model: Optional[str] = None,
+        **kwargs,
     ) -> ResponseType[AutomaticTranslationDataClass]:
         url = f"{self.url}translate"
 
@@ -80,37 +85,35 @@ class DeeplApi(ProviderInterface, TranslationInterface):
         source_language: str,
         target_language: str,
         file_url: str = "",
+        **kwargs,
     ) -> ResponseType[DocumentTranslationDataClass]:
         mimetype = mimetypes.guess_type(file)[0]
         extension = mimetypes.guess_extension(mimetype)
 
-        file_ = open(file, "rb")
+        with open(file, "rb") as file_:
+            files = {
+                "file": file_,
+            }
 
-        files = {
-            "file": file_,
-        }
+            data = {"target_lang": target_language, "source_lang": source_language}
 
-        data = {"target_lang": target_language, "source_lang": source_language}
-
-        try:
-            response = requests.post(
-                f"{self.url}document", headers=self.header, data=data, files=files
-            )
-        except:
-            raise ProviderException(
-                "Something went wrong when performing document translation!!", 500
-            )
-        if response.status_code >= 400:
-            raise ProviderException(
-                message=http.client.responses[response.status_code],
-                code=response.status_code,
-            )
-        try:
-            original_response = response.json()
-        except json.JSONDecodeError:
-            raise ProviderException("Internal server error", 500)
-
-        file_.close()
+            try:
+                response = requests.post(
+                    f"{self.url}document", headers=self.header, data=data, files=files
+                )
+            except:
+                raise ProviderException(
+                    "Something went wrong when performing document translation!!", 500
+                )
+            if response.status_code >= 400:
+                raise ProviderException(
+                    message=http.client.responses[response.status_code],
+                    code=response.status_code,
+                )
+            try:
+                original_response = response.json()
+            except json.JSONDecodeError:
+                raise ProviderException("Internal server error", 500)
 
         if response.status_code != 200:
             raise ProviderException(

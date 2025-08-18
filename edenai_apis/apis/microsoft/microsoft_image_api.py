@@ -54,17 +54,16 @@ from edenai_apis.utils.types import ResponseType
 
 class MicrosoftImageApi(ImageInterface):
     def image__explicit_content(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: Optional[str] = None, **kwargs
     ) -> ResponseType[ExplicitContentDataClass]:
-        file_ = open(file, "rb")
-        # Getting response of API
-        response = requests.post(
-            f"{self.url['vision']}/analyze?visualFeatures=Adult",
-            headers=self.headers["vision"],
-            data=file_,
-        )
-        data = response.json()
-        file_.close()
+        with open(file, "rb") as file_:
+            # Getting response of API
+            response = requests.post(
+                f"{self.url['vision']}/analyze?visualFeatures=Adult",
+                headers=self.headers["vision"],
+                data=file_,
+            )
+            data = response.json()
 
         # error handling
         if response.status_code != 200:
@@ -108,16 +107,15 @@ class MicrosoftImageApi(ImageInterface):
         return res
 
     def image__object_detection(
-        self, file: str, model: str = None, file_url: str = ""
+        self, file: str, model: str = None, file_url: str = "", **kwargs
     ) -> ResponseType[ObjectDetectionDataClass]:
-        file_ = open(file, "rb")
-        response = requests.post(
-            f"{self.url['vision']}/detect",
-            headers=self.headers["vision"],
-            data=file_,
-        )
-        data = response.json()
-        file_.close()
+        with open(file, "rb") as file_:
+            response = requests.post(
+                f"{self.url['vision']}/detect",
+                headers=self.headers["vision"],
+                data=file_,
+            )
+            data = response.json()
 
         if response.status_code != 200:
             error = data["error"]
@@ -160,30 +158,30 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_detection(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[FaceDetectionDataClass]:
-        file_ = open(file, "rb")
-        file_content = file_.read()
-        # Getting size of image
-        img_size = Img.open(file).size
+        with open(file, "rb") as file_, Img.open(file) as img:
+            file_content = file_.read()
+            # Getting size of image
+            img_size = img.size
 
-        # Create params for returning face attribute
-        params = {
-            "recognitionModel": "recognition_04",
-            "returnFaceId": "true",
-            "returnFaceLandmarks": "true",
-            "returnFaceAttributes": (
-                "age,gender,headPose,smile,facialHair,glasses,emotion,"
-                "hair,makeup,occlusion,accessories,blur,exposure,noise"
-            ),
-        }
-        # Getting response of API
-        request = requests.post(
-            f"{self.url['face']}/detect",
-            params=params,
-            headers=self.headers["face"],
-            data=file_content,
-        )
+            # Create params for returning face attribute
+            params = {
+                "recognitionModel": "recognition_04",
+                "returnFaceId": "true",
+                "returnFaceLandmarks": "true",
+                "returnFaceAttributes": (
+                    "age,gender,headPose,smile,facialHair,glasses,emotion,"
+                    "hair,makeup,occlusion,accessories,blur,exposure,noise"
+                ),
+            }
+            # Getting response of API
+            request = requests.post(
+                f"{self.url['face']}/detect",
+                params=params,
+                headers=self.headers["face"],
+                data=file_content,
+            )
         response = request.json()
 
         # handle error
@@ -204,16 +202,15 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__logo_detection(
-        self, file: str, file_url: str = "", model: str = None
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[LogoDetectionDataClass]:
-        file_ = open(file, "rb")
-        response = requests.post(
-            f"{self.url['vision']}/analyze?visualFeatures=Brands",
-            headers=self.headers["vision"],
-            data=file_,
-        )
-        data = response.json()
-        file_.close()
+        with open(file, "rb") as file_:
+            response = requests.post(
+                f"{self.url['vision']}/analyze?visualFeatures=Brands",
+                headers=self.headers["vision"],
+                data=file_,
+            )
+            data = response.json()
 
         if response.status_code != 200:
             # sometimes no "error" key in repsonse
@@ -247,7 +244,7 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__landmark_detection(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[LandmarkDetectionDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -275,7 +272,7 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_recognition__create_collection(
-        self, collection_id: str
+        self, collection_id: str, **kwargs
     ) -> FaceRecognitionCreateCollectionDataClass:
         url = f"{self.url['face']}facelists/{collection_id}"
         headers = {
@@ -293,7 +290,7 @@ class MicrosoftImageApi(ImageInterface):
         return FaceRecognitionCreateCollectionDataClass(collection_id=collection_id)
 
     def image__face_recognition__list_collections(
-        self,
+        self, **kwargs
     ) -> ResponseType[FaceRecognitionListCollectionsDataClass]:
         url = f"{self.url['face']}facelists"
         headers = {
@@ -316,7 +313,7 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_recognition__list_faces(
-        self, collection_id: str
+        self, collection_id: str, **kwargs
     ) -> ResponseType[FaceRecognitionListFacesDataClass]:
         url = f"{self.url['face']}facelists/{collection_id}"
         headers = {
@@ -339,7 +336,7 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_recognition__delete_collection(
-        self, collection_id: str
+        self, collection_id: str, **kwargs
     ) -> ResponseType[FaceRecognitionDeleteCollectionDataClass]:
         url = f"{self.url['face']}facelists/{collection_id}"
         headers = {
@@ -360,13 +357,12 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_recognition__add_face(
-        self, collection_id: str, file: str, file_url: str = ""
+        self, collection_id: str, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[FaceRecognitionAddFaceDataClass]:
         url = f"{self.url['face']}facelists/{collection_id}/persistedFaces?detectionModel=detection_03"
         headers = self.headers["face"]
-        file_ = open(file, "rb")
-        response = requests.post(url=url, headers=headers, data=file_)
-        file_.close()
+        with open(file, "rb") as file_:
+            response = requests.post(url=url, headers=headers, data=file_)
         if response.status_code != 200:
             raise ProviderException(
                 response.json()["error"]["message"], code=response.status_code
@@ -380,7 +376,7 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_recognition__delete_face(
-        self, collection_id, face_id
+        self, collection_id, face_id, **kwargs
     ) -> ResponseType[FaceRecognitionDeleteFaceDataClass]:
         url = f"{self.url['face']}facelists/{collection_id}/persistedFaces/{face_id}"
         headers = {
@@ -399,7 +395,7 @@ class MicrosoftImageApi(ImageInterface):
         )
 
     def image__face_recognition__recognize(
-        self, collection_id: str, file: str, file_url: str = ""
+        self, collection_id: str, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[FaceRecognitionRecognizeDataClass]:
         # we first need to detect the face, extract the faceId
         # and then make the call for face similarities using this id
@@ -443,6 +439,7 @@ class MicrosoftImageApi(ImageInterface):
         file: str,
         file_url: str = "",
         provider_params: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> ResponseType[BackgroundRemovalDataClass]:
         with open(file, "rb") as f:
             if provider_params is None or not isinstance(provider_params, dict):
@@ -465,7 +462,6 @@ class MicrosoftImageApi(ImageInterface):
             if response.status_code != 200:
                 try:
                     original_response = response.json()
-                    print(original_response)
                     error_message = (
                         original_response["error"]["code"]
                         + ": "

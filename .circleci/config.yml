@@ -21,12 +21,19 @@ jobs:
             # Copy settings file
             aws s3 cp $S3PATH edenai_apis/api_keys --recursive
 
+
+      - run: 
+         name: Install Poetry
+         command: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo 'export PATH="$HOME/.local/bin:$PATH"' >> $BASH_ENV
+
       - run:
           name: Install dependencies
           command: |
             sudo apt-get update
             sudo apt-get install ffmpeg -y
-            pip install -r requirements.txt
+            poetry install --no-interaction --no-root
 
       - run:
           name: Test
@@ -64,17 +71,24 @@ jobs:
             pip install awscli --upgrade
             # Copy settings file
             aws s3 cp $S3PATH edenai_apis/api_keys --recursive
+
+      - run: 
+         name: Install Poetry
+         command: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo 'export PATH="$HOME/.local/bin:$PATH"' >> $BASH_ENV
+
       - run:
           name: Install dependencies
           command: |
             sudo apt-get update
             sudo apt-get install ffmpeg -y
-            pip install -e .
+            poetry install --no-interaction
             
       - run:
           name: check working providers
           command: |
-            python edenai_apis/scripts/check_not_working_providers.py << parameters.interval >>
+            poetry run python edenai_apis/scripts/check_not_working_providers.py << parameters.interval >>
 
 
 # Invoke jobs via workflows

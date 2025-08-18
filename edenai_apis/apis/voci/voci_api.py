@@ -44,6 +44,7 @@ class VociApi(ProviderInterface, AudioInterface):
         model: Optional[str] = None,
         file_url: str = "",
         provider_params: Optional[dict] = None,
+        **kwargs,
     ) -> AsyncLaunchJobResponseType:
         provider_params = provider_params or {}
         export_format, channels, frame_rate = audio_attributes
@@ -68,17 +69,17 @@ class VociApi(ProviderInterface, AudioInterface):
         #     })
 
         data_config.update(provider_params)
-        file_ = open(file, "rb")
-        response = requests.post(
-            url="https://vcloud.vocitec.com/transcribe",
-            data=data_config,
-            files=[("file", file_)],
-        )
+        with open(file, "rb") as file_:
+            response = requests.post(
+                url="https://vcloud.vocitec.com/transcribe",
+                data=data_config,
+                files=[("file", file_)],
+            )
         if response.status_code != 200:
             raise ProviderException(
                 f"Call to Voci failed.\nResponse Status: {response.status_code}.\n"
                 + f"Response Content: {response.content}",
-                code = response.status_code
+                code=response.status_code,
             )
         else:
             original_response = response.json()
@@ -100,7 +101,7 @@ class VociApi(ProviderInterface, AudioInterface):
                 raise ProviderException(
                     f"Call to Voci failed.\nResponse Status: {response.status_code}.\n"
                     + f"Response Content: {response.text}",
-                    code = response.status_code
+                    code=response.status_code,
                 )
 
             original_response = response_text.json()
@@ -145,6 +146,6 @@ class VociApi(ProviderInterface, AudioInterface):
             ):
                 raise AsyncJobException(
                     reason=AsyncJobExceptionReason.DEPRECATED_JOB_ID,
-                    code = response.status_code
+                    code=response.status_code,
                 )
             raise ProviderException(response.text)

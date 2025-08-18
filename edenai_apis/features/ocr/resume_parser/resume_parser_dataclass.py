@@ -33,6 +33,7 @@ class ResumeWorkExpEntry(BaseModel):
     company: Optional[StrictStr]
     location: Optional[ResumeLocation]
     description: Optional[StrictStr]
+    type: Optional[StrictStr] = None
     industry: Optional[StrictStr]  # Hireability
 
 
@@ -69,7 +70,7 @@ class ResumePersonalName(BaseModel):
 
 class ResumePersonalInfo(BaseModel):
     name: ResumePersonalName
-    address: ResumeLocation
+    address: Optional[ResumeLocation]
     self_summary: Optional[StrictStr]  # all
     objective: Optional[StrictStr]  # Hireability
     date_of_birth: Optional[StrictStr]  # Affinda
@@ -83,6 +84,7 @@ class ResumePersonalInfo(BaseModel):
     nationality: Optional[StrictStr]  # Hireability
     martial_status: Optional[StrictStr]  # Hireability
     current_salary: Optional[StrictStr]  # Hireability
+    availability: Optional[StrictStr] = None
 
 
 class ResumeExtractedData(BaseModel):

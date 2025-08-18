@@ -1,30 +1,72 @@
 import base64
-from io import BytesIO
 import json
 import uuid
-from typing import Optional, List
+from io import BytesIO
+from typing import List, Optional
+
 import requests
+
 from edenai_apis.apis.amazon.helpers import check_webhook_result
+from edenai_apis.features import AudioInterface
 from edenai_apis.features.audio import TextToSpeechDataClass
-from edenai_apis.utils.types import (
-    AsyncBaseResponseType,
-    AsyncLaunchJobResponseType,
-    AsyncResponseType,
-    AsyncPendingResponseType,
-    ResponseType,
-)
 from edenai_apis.features.audio.speech_to_text_async.speech_to_text_async_dataclass import (
     SpeechDiarization,
     SpeechToTextAsyncDataClass,
 )
-from edenai_apis.features import AudioInterface
 from edenai_apis.utils.exception import ProviderException
+from edenai_apis.utils.types import (
+    AsyncBaseResponseType,
+    AsyncLaunchJobResponseType,
+    AsyncPendingResponseType,
+    AsyncResponseType,
+    ResponseType,
+)
+from edenai_apis.utils.upload_s3 import USER_PROCESS, upload_file_bytes_to_s3
 
-from edenai_apis.utils.upload_s3 import upload_file_bytes_to_s3, USER_PROCESS
 from .helpers import convert_tts_audio_rate
 
 
 class OpenaiAudioApi(AudioInterface):
+    def _speech_to_text(
+        self,
+        file: str,
+        language: str,
+        speakers: int,
+        profanity_filter: bool,
+        vocabulary: Optional[List[str]],
+        audio_attributes: tuple,
+        model: Optional[str] = None,
+        file_url: str = "",
+        provider_params: Optional[dict] = None,
+    ):
+        provider_params = provider_params or {}
+        data_job_id = {}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "OpenAI-Organization": self.org_key,
+        }
+        url = "https://api.openai.com/v1/audio/transcriptions"
+        with open(file, "rb") as file_:
+            files = {"file": file_}
+            payload = {"model": "whisper-1", "language": language, **provider_params}
+            response = requests.post(url, data=payload, files=files, headers=headers)
+            if response.status_code != 200:
+                raise ProviderException(response.text, response.status_code)
+
+        try:
+            original_response = response.json()
+        except requests.JSONDecodeError as exp:
+            raise ProviderException("Internal Server Error", code=500) from exp
+        diarization = SpeechDiarization(total_speakers=0, entries=[])
+        standardized_response = SpeechToTextAsyncDataClass(
+            text=original_response.get("text"), diarization=diarization
+        )
+        return AsyncResponseType[SpeechToTextAsyncDataClass](
+            original_response=original_response,
+            standardized_response=standardized_response,
+            provider_job_id=str(uuid.uuid4()),
+        )
+
     def audio__speech_to_text_async__launch_job(
         self,
         file: str,
@@ -36,86 +78,18 @@ class OpenaiAudioApi(AudioInterface):
         model: Optional[str] = None,
         file_url: str = "",
         provider_params: Optional[dict] = None,
+        **kwargs,
     ) -> AsyncLaunchJobResponseType:
-        provider_params = provider_params or {}
-        data_job_id = {}
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "OpenAI-Organization": self.org_key,
-        }
-        url = "https://api.openai.com/v1/audio/transcriptions"
-        file_ = open(file, "rb")
-        files = {"file": file_}
-        payload = {"model": "whisper-1", "language": language, **provider_params}
-        response = requests.post(url, data=payload, files=files, headers=headers)
-        if response.status_code != 200:
-            raise ProviderException(response.text, response.status_code)
-
-        job_id = str(uuid.uuid4())
-        try:
-            original_response = response.json()
-        except requests.JSONDecodeError as exp:
-            raise ProviderException("Internal Server Error", code=500) from exp
-        data_job_id[job_id] = original_response
-        requests.post(
-            url=f"https://webhook.site/{self.webhook_token}",
-            data=json.dumps(data_job_id),
-            headers={"content-type": "application/json"},
-        )
-        return AsyncLaunchJobResponseType(provider_job_id=job_id)
-
-    def audio__speech_to_text_async__get_job_result(
-        self, provider_job_id: str
-    ) -> AsyncBaseResponseType[SpeechToTextAsyncDataClass]:
-        if not provider_job_id:
-            raise ProviderException("Job id None or empty!")
-
-        # Get results from webhooks :
-        # List all webhook results
-        # Getting results from webhook.site
-
-        wehbook_result, response_status = check_webhook_result(
-            provider_job_id, self.webhook_settings
-        )
-
-        if response_status != 200:
-            raise ProviderException(wehbook_result, code=response_status)
-
-        result_object = (
-            next(
-                filter(
-                    lambda response: provider_job_id in response["content"],
-                    wehbook_result,
-                ),
-                None,
-            )
-            if wehbook_result
-            else None
-        )
-
-        if not result_object or not result_object.get("content"):
-            raise ProviderException("Provider returned an empty response")
-
-        try:
-            original_response = json.loads(result_object["content"]).get(
-                provider_job_id, None
-            )
-        except json.JSONDecodeError:
-            raise ProviderException("An error occurred while parsing the response.")
-
-        if original_response is None:
-            return AsyncPendingResponseType[SpeechToTextAsyncDataClass](
-                provider_job_id=provider_job_id
-            )
-
-        diarization = SpeechDiarization(total_speakers=0, entries=[])
-        standardized_response = SpeechToTextAsyncDataClass(
-            text=original_response.get("text"), diarization=diarization
-        )
-        return AsyncResponseType[SpeechToTextAsyncDataClass](
-            original_response=original_response,
-            standardized_response=standardized_response,
-            provider_job_id=provider_job_id,
+        return self._speech_to_text(
+            file,
+            language,
+            speakers,
+            profanity_filter,
+            vocabulary,
+            audio_attributes,
+            model,
+            file_url,
+            provider_params,
         )
 
     def audio__text_to_speech(
@@ -129,6 +103,7 @@ class OpenaiAudioApi(AudioInterface):
         speaking_pitch: int,
         speaking_volume: int,
         sampling_rate: int,
+        **kwargs,
     ) -> ResponseType[TextToSpeechDataClass]:
         url = "https://api.openai.com/v1/audio/speech"
         speed = convert_tts_audio_rate(speaking_rate)

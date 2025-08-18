@@ -66,10 +66,7 @@ from edenai_apis.utils.types import (
 
 class GoogleOcrApi(OcrInterface):
     def ocr__ocr(
-        self,
-        file: str,
-        language: str,
-        file_url: str = "",
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[OcrDataClass]:
         with open(file, "rb") as file_:
             file_content = file_.read()
@@ -123,7 +120,7 @@ class GoogleOcrApi(OcrInterface):
         )
 
     def ocr__receipt_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[ReceiptParserDataClass]:
         mimetype = mimetypes.guess_type(file)[0] or "unrecognized"
 
@@ -138,18 +135,20 @@ class GoogleOcrApi(OcrInterface):
             receipt_parser_project_id, "eu", receipt_parser_process_id
         )
 
-        file_ = open(file, "rb")
-        raw_document = documentai.RawDocument(content=file_.read(), mime_type=mimetype)
+        with open(file, "rb") as file_:
+            raw_document = documentai.RawDocument(
+                content=file_.read(), mime_type=mimetype
+            )
 
-        payload_request = {"name": name, "raw_document": raw_document}
-        request = handle_google_call(documentai.ProcessRequest, **payload_request)
+            payload_request = {"name": name, "raw_document": raw_document}
+            request = handle_google_call(documentai.ProcessRequest, **payload_request)
 
-        payload_result = {"request": request}
-        result = handle_google_call(receipt_client.process_document, **payload_result)
+            payload_result = {"request": request}
+            result = handle_google_call(
+                receipt_client.process_document, **payload_result
+            )
 
-        document = result.document
-
-        file_.close()
+            document = result.document
 
         receipt_infos: InfosReceiptParserDataClass = InfosReceiptParserDataClass()
         receipt_taxe: Taxes = Taxes()
@@ -234,7 +233,7 @@ class GoogleOcrApi(OcrInterface):
         )
 
     def ocr__invoice_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[InvoiceParserDataClass]:
         mimetype = mimetypes.guess_type(file)[0] or "unrecognized"
 
@@ -249,11 +248,11 @@ class GoogleOcrApi(OcrInterface):
             invoice_parser_project_id, "eu", invoice_parser_process_id
         )
 
-        file_ = open(file, "rb")
+        with open(file, "rb") as file_:
+            raw_document = documentai.RawDocument(
+                content=file_.read(), mime_type=mimetype
+            )
 
-        raw_document = documentai.RawDocument(content=file_.read(), mime_type=mimetype)
-
-        file_.close()
         payload_request = {"name": name, "raw_document": raw_document}
         request = handle_google_call(documentai.ProcessRequest, **payload_request)
 
@@ -385,7 +384,7 @@ class GoogleOcrApi(OcrInterface):
         )
 
     def ocr__ocr_tables_async__launch_job(
-        self, file: str, file_type: str, language: str, file_url: str = ""
+        self, file: str, file_type: str, language: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         file_name: str = file.split("/")[-1]  # file.name give its whole path
 
@@ -482,7 +481,7 @@ class GoogleOcrApi(OcrInterface):
         )
 
     def ocr__ocr_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         call_uuid = uuid.uuid4().hex
         filename: str = call_uuid + file.split("/")[-1]
@@ -545,7 +544,13 @@ class GoogleOcrApi(OcrInterface):
         return AsyncPendingResponseType[OcrTablesAsyncDataClass](provider_job_id=job_id)
 
     def ocr__financial_parser(
-        self, file: str, language: str, document_type: str, file_url: str = ""
+        self,
+        file: str,
+        language: str,
+        document_type: str,
+        file_url: str = "",
+        model: str = None,
+        **kwargs,
     ) -> ResponseType[FinancialParserDataClass]:
         mimetype = mimetypes.guess_type(file)[0] or "unrecognized"
         financial_project_id = self.api_settings["documentai"]["project_id"]
@@ -565,20 +570,20 @@ class GoogleOcrApi(OcrInterface):
         name = financial_parser_client.processor_path(
             financial_project_id, "eu", financial_parser_process_id
         )
-        file_ = open(file, "rb")
-        raw_document = documentai.RawDocument(content=file_.read(), mime_type=mimetype)
+        with open(file, "rb") as file_:
+            raw_document = documentai.RawDocument(
+                content=file_.read(), mime_type=mimetype
+            )
 
-        payload_request = {"name": name, "raw_document": raw_document}
-        request = handle_google_call(documentai.ProcessRequest, **payload_request)
+            payload_request = {"name": name, "raw_document": raw_document}
+            request = handle_google_call(documentai.ProcessRequest, **payload_request)
 
-        payload_result = {"request": request}
-        result = handle_google_call(
-            financial_parser_client.process_document, **payload_result
-        )
-        document = result.document
+            payload_result = {"request": request}
+            result = handle_google_call(
+                financial_parser_client.process_document, **payload_result
+            )
+            document = result.document
 
-        file_.close()
-        file_ = open(file, "rb")
         standardized_response = google_financial_parser(document)
 
         return ResponseType[FinancialParserDataClass](

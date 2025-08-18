@@ -1,46 +1,5 @@
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from edenai_apis.features.ocr.identity_parser import (
-    IdentityParserDataClass,
-    InfoCountry,
-    InfosIdentityParserDataClass,
-    ItemIdentityParserDataClass,
-    format_date,
-    get_info_country,
-)
-from edenai_apis.features.ocr.invoice_parser import (
-    BankInvoice,
-    InfosInvoiceParserDataClass,
-    InvoiceParserDataClass,
-    ItemLinesInvoice,
-    TaxesInvoice,
-)
-from edenai_apis.features.ocr.invoice_parser import (
-    MerchantInformationInvoice,
-    CustomerInformationInvoice,
-)
-from edenai_apis.features.ocr.receipt_parser import (
-    InfosReceiptParserDataClass,
-    ItemLines,
-    Locale,
-    MerchantInformation,
-    PaymentInformation,
-    ReceiptParserDataClass,
-    Taxes,
-)
-from edenai_apis.features.ocr.resume_parser import (
-    ResumeEducation,
-    ResumeEducationEntry,
-    ResumeLocation,
-    ResumePersonalInfo,
-    ResumePersonalName,
-    ResumeExtractedData,
-    ResumeLang,
-    ResumeParserDataClass,
-    ResumeSkill,
-    ResumeWorkExp,
-    ResumeWorkExpEntry,
-)
 from edenai_apis.features.ocr.financial_parser import (
     FinancialBankInformation,
     FinancialBarcode,
@@ -54,10 +13,51 @@ from edenai_apis.features.ocr.financial_parser import (
     FinancialParserObjectDataClass,
     FinancialPaymentInformation,
 )
+from edenai_apis.features.ocr.identity_parser import (
+    IdentityParserDataClass,
+    InfoCountry,
+    InfosIdentityParserDataClass,
+    ItemIdentityParserDataClass,
+    format_date,
+    get_info_country,
+)
+from edenai_apis.features.ocr.invoice_parser import (
+    BankInvoice,
+    CustomerInformationInvoice,
+    InfosInvoiceParserDataClass,
+    InvoiceParserDataClass,
+    ItemLinesInvoice,
+    MerchantInformationInvoice,
+    TaxesInvoice,
+)
+from edenai_apis.features.ocr.receipt_parser import (
+    InfosReceiptParserDataClass,
+    ItemLines,
+    Locale,
+    MerchantInformation,
+    PaymentInformation,
+    ReceiptParserDataClass,
+    Taxes,
+)
+from edenai_apis.features.ocr.resume_parser import (
+    ResumeEducation,
+    ResumeEducationEntry,
+    ResumeExtractedData,
+    ResumeLang,
+    ResumeLocation,
+    ResumeParserDataClass,
+    ResumePersonalInfo,
+    ResumePersonalName,
+    ResumeSkill,
+    ResumeWorkExp,
+    ResumeWorkExpEntry,
+)
 from edenai_apis.utils.conversion import (
     combine_date_with_time,
     convert_string_to_number,
 )
+from edenai_apis.utils.parsing import extract
+
 from .models import Document, DocumentError, DocumentMeta
 
 
@@ -77,50 +77,65 @@ class ResumeStandardizer:
         self.__std_response = {}
 
     def __std_names(self) -> ResumePersonalName:
-        name = self.__data.get("name") or {}
+        name = self.__data.get("candidateName") or {}
         return ResumePersonalName(
             raw_name=name.get("raw"),
-            first_name=name.get("first"),
-            last_name=name.get("last"),
-            middle=name.get("middle"),
-            title=name.get("title"),
-            sufix=None,
+            first_name=extract(name, ["parsed", "candidateNameFirst", "parsed"]),
+            last_name=extract(name, ["parsed", "candidateNameFamily", "parsed"]),
+            middle=extract(name, ["parsed", "candidateNameMiddle", "parsed"]),
+            title=extract(name, ["parsed", "candidateNameTitle", "parsed"]),
+            sufix=extract(name, ["parsed", "candidateNameSuffix", "parsed"]),
             prefix=None,
         )
 
-    def __std_location(self, which_location: Optional[dict] = None) -> ResumeLocation:
+    def __std_location(
+        self, key: str, which_location: Optional[dict] = None
+    ) -> ResumeLocation:
         if which_location is None:
             which_location = self.__data
-        location = which_location.get("location") or {}
+        location = which_location.get(key) or {}
         return ResumeLocation(
             raw_input_location=location.get("rawInput"),
-            postal_code=location.get("postalCode"),
-            region=location.get("state"),
-            country_code=location.get("countryCode"),
-            country=location.get("country"),
-            appartment_number=location.get("apartmentNumber"),
-            city=location.get("city"),
-            street=location.get("street"),
-            street_number=location.get("streetNumber"),
-            formatted_location=location.get("formatted"),
+            postal_code=extract(location, ["parsed", "postalCode"]),
+            region=extract(location, ["parsed", "state"]),
+            country_code=extract(location, ["parsed", "countryCode"]),
+            country=extract(location, ["parsed", "country"]),
+            appartment_number=extract(location, ["parsed", "apartmentNumber"]),
+            city=extract(location, ["parsed", "city"]),
+            street=extract(location, ["parsed", "street"]),
+            street_number=extract(location, ["parsed", "streetNumber"]),
+            formatted_location=extract(location, ["parsed", "formatted"]),
         )
 
     def std_personnal_information(self) -> ResumePersonalInfo:
         self.__std_response["personal_infos"] = ResumePersonalInfo(
             name=self.__std_names(),
-            address=self.__std_location(),
-            phones=self.__data.get("phoneNumbers") or [],
-            mails=self.__data.get("emails") or [],
-            urls=self.__data.get("websites") or [],
-            self_summary=self.__data.get("summary"),
+            address=self.__std_location(key="location"),
+            phones=[
+                phone["raw"]
+                for phone in self.__data.get("phoneNumber", []) or []
+                if phone.get("raw")
+            ],
+            mails=[
+                email["parsed"]
+                for email in self.__data.get("email", []) or []
+                if email.get("parsed")
+            ],
+            urls=[
+                website["raw"]
+                for website in self.__data.get("website", []) or []
+                if website.get("raw")
+            ],
+            self_summary=extract(self.__data, ["summary", "parsed"]),
             current_profession=self.__data.get("profession"),
-            objective=self.__data.get("objective"),
-            date_of_birth=self.__data.get("dateOfBirth"),
+            objective=extract(self.__data, ["objective", "parsed"]),
+            date_of_birth=extract(self.__data, ["dateOfBirth", "parsed"]),
             place_of_birth=None,
             gender=None,
-            nationality=None,
+            nationality=extract(self.__data, ["nationality", "parsed"]),
             martial_status=None,
             current_salary=None,
+            availability=extract(self.__data, ["availability", "parsed"]),
         )
 
         return self.__std_response["personal_infos"]
@@ -128,18 +143,31 @@ class ResumeStandardizer:
     def std_education(self) -> ResumeEducation:
         edu_entries: List[ResumeEducationEntry] = []
         for i in self.__data.get("education") or []:
-            dates = i.get("dates") or {}
-            grade = i.get("grade") or {}
+            education = i.get("parsed", {})
+            location = self.__std_location(
+                which_location=education, key="educationLocation"
+            )
+            start_date = extract(
+                education, ["educationDateRange", "parsed", "start", "date"]
+            )
+            end_date = extract(
+                education, ["educationDateRange", "parsed", "end", "date"]
+            )
+            grade = extract(education, ["educationGrade", "raw"])
+            accreditation = extract(education, ["educationAccreditation", "parsed"])
+            establishment = extract(education, ["educationOrganization", "parsed"])
+            title = extract(education, ["educationLevel", "parsed", "value"])
+            description = extract(education, ["educationMajor", "parsed"])
             edu_entries.append(
                 ResumeEducationEntry(
-                    location=self.__std_location(which_location=i),
-                    start_date=dates.get("startDate"),
-                    end_date=dates.get("completionDate"),
-                    establishment=i.get("organization"),
-                    gpa=grade.get("value"),
-                    accreditation=i.get("accreditation", {}).get("education"),
-                    title=None,
-                    description=None,
+                    location=location,
+                    start_date=start_date,
+                    end_date=end_date,
+                    establishment=establishment,
+                    gpa=grade,
+                    accreditation=accreditation,
+                    title=title,
+                    description=description,
                 )
             )
 
@@ -152,20 +180,41 @@ class ResumeStandardizer:
     def std_work_experience(self) -> ResumeWorkExp:
         work_entries: List[ResumeWorkExpEntry] = []
         for i in self.__data.get("workExperience") or []:
-            dates = i.get("dates") or {}
+            work_experience = i.get("parsed", {})
             work_entries.append(
                 ResumeWorkExpEntry(
-                    title=i.get("jobTitle"),
-                    company=i.get("organization"),
-                    start_date=dates.get("startDate"),
-                    end_date=dates.get("endDate"),
-                    description=i.get("job_description"),
-                    location=self.__std_location(which_location=i),
+                    title=extract(work_experience, ["jobTitle", "parsed"]),
+                    company=extract(
+                        work_experience, ["workExperienceOrganization", "parsed"]
+                    ),
+                    start_date=extract(
+                        work_experience,
+                        ["workExperienceDateRange", "parsed", "start", "date"],
+                    ),
+                    end_date=extract(
+                        work_experience,
+                        ["workExperienceDateRange", "parsed", "end", "date"],
+                    ),
+                    description=extract(work_experience, ["jobDescription", "parsed"]),
+                    location=self.__std_location(
+                        which_location=work_experience, key="workExperienceLocation"
+                    ),
+                    type=extract(
+                        work_experience, ["workExperienceType", "parsed", "value"]
+                    ),
                     industry=None,
                 )
             )
+
+        total_years = extract(self.__data, ["totalYearsExperience", "parsed"])
+
+        if isinstance(total_years, (int, float)):
+            total_years = str(total_years)
+        else:
+            total_years = None
+
         self.__std_response["work_experience"] = ResumeWorkExp(
-            total_years_experience=self.__data.get("total_years_experience"),
+            total_years_experience=total_years,
             entries=work_entries,
         )
 
@@ -173,12 +222,11 @@ class ResumeStandardizer:
 
     def std_skills(self) -> List[ResumeSkill]:
         self.__std_response["skills"] = []
-        for i in self.__data.get("skills", []) or []:
-            skill_name = i.get("name")
-            skill_type = i.get("type").replace("_skill", "")
-            self.__std_response["skills"].append(
-                ResumeSkill(name=skill_name, type=skill_type)
-            )
+        for i in self.__data.get("skill", []) or []:
+            name = extract(i, ["parsed", "name"])
+            value = extract(i, ["parsed", "type"])
+            if name and value:
+                self.__std_response["skills"].append(ResumeSkill(name=name, type=value))
 
         return self.__std_response["skills"]
 
@@ -186,14 +234,19 @@ class ResumeStandardizer:
         self,
     ) -> Tuple[List[ResumeLang], List[ResumeSkill], List[ResumeSkill]]:
         self.__std_response["languages"] = [
-            ResumeLang(name=i, code=None) for i in self.__data.get("languages", [])
+            ResumeLang(
+                name=extract(i, ["raw"]),
+                code=extract(i, ["parsed", "languageName", "parsed", "value"]),
+            )
+            for i in self.__data.get("language") or []
         ]
         self.__std_response["certifications"] = [
-            ResumeSkill(name=i, type=None)
-            for i in self.__data.get("certifications", [])
+            ResumeSkill(name=extract(i, ["parsed"]), type=None)
+            for i in self.__data.get("achievement") or []
         ]
         self.__std_response["publications"] = [
-            ResumeSkill(name=i, type=None) for i in self.__data.get("publications", [])
+            ResumeSkill(name=i.get("raw"), type=None)
+            for i in self.__data.get("publications") or []
         ]
 
         return (
@@ -662,96 +715,98 @@ class FinancialStandardizer:
     def std_response(self) -> List[FinancialParserObjectDataClass]:
         extracted_data = []
         for page_idx, invoice in enumerate(self.__formatted_data):
-            address_parsed = (invoice.get("customerBillingAddress", {}) or {}).get(
-                "parsed", {}
-            ) or {}
+            address_parsed = extract(
+                invoice, ["customerBillingAddress", "parsed"], fallback={}
+            )
+
             customer_information = FinancialCustomerInformation(
-                name=invoice.get("customerContactName", {}).get("raw"),
-                billing_address=invoice.get("customerBillingAddress", {}).get("raw"),
-                shipping_address=invoice.get("customerDeliveryAddress", {}).get("raw"),
+                name=extract(invoice, ["customerContactName", "raw"]),
+                billing_address=extract(invoice, ["customerBillingAddress", "raw"]),
+                shipping_address=extract(invoice, ["customerDeliveryAddress", "raw"]),
                 country=address_parsed.get("country"),
                 zip_code=address_parsed.get("postalCode"),
                 city=address_parsed.get("city"),
                 street_name=address_parsed.get("street"),
                 house_number=address_parsed.get("apartmentNumber"),
                 province=address_parsed.get("state"),
-                business_number=invoice.get("customerBusinessNumber", {}).get("raw"),
-                email=invoice.get("customerEmail", {}).get("raw"),
-                id_reference=invoice.get("customerNumber", {}).get("raw"),
-                phone=invoice.get("customerPhoneNumber", {}).get("raw"),
-                vat_number=invoice.get("customerVat", {}).get("raw"),
+                business_number=extract(invoice, ["customerBusinessNumber", "raw"]),
+                email=extract(invoice, ["customerEmail", "raw"]),
+                id_reference=extract(invoice, ["customerNumber", "raw"]),
+                phone=extract(invoice, ["customerPhoneNumber", "raw"]),
+                vat_number=extract(invoice, ["customerVat", "raw"]),
             )
             merchant_information = FinancialMerchantInformation(
-                address=invoice.get("supplierAddress", {}).get("raw"),
-                country=invoice.get("supplierAddress", {})
-                .get("parsed", {})
-                .get("country"),
-                street_name=invoice.get("supplierAddress", {})
-                .get("parsed", {})
-                .get("street"),
-                house_number=invoice.get("supplierAddress", {})
-                .get("parsed", {})
-                .get("apartmentNumber"),
-                city=invoice.get("supplierAddress", {}).get("parsed", {}).get("city"),
-                zip_code=invoice.get("supplierAddress", {})
-                .get("parsed", {})
-                .get("postalCode"),
-                province=invoice.get("supplierAddress", {})
-                .get("parsed", {})
-                .get("state"),
-                business_number=invoice.get("supplierBusinessNumber", {}).get("raw"),
-                name=invoice.get("supplierCompanyName", {}).get("raw"),
-                email=invoice.get("supplierEmail", {}).get("raw"),
-                phone=invoice.get("supplierPhoneNumber", {}).get("raw"),
-                vat_number=invoice.get("supplierVat", {}).get("raw"),
-                website=invoice.get("supplierWebsite", {}).get("raw"),
+                address=extract(invoice, ["supplierAddress", "raw"]),
+                country=extract(invoice, ["supplierAddress", "parsed", "country"]),
+                street_name=extract(invoice, ["supplierAddress", "parsed", "street"]),
+                house_number=extract(
+                    invoice, ["supplierAddress", "parsed", "apartmentNumber"]
+                ),
+                city=extract(invoice, ["supplierAddress", "parsed", "city"]),
+                zip_code=extract(invoice, ["supplierAddress", "parsed", "postalCode"]),
+                province=extract(invoice, ["supplierAddress", "parsed", "state"]),
+                business_number=extract(invoice, ["supplierBusinessNumber", "raw"]),
+                name=extract(invoice, ["supplierCompanyName", "raw"]),
+                email=extract(invoice, ["supplierEmail", "raw"]),
+                phone=extract(invoice, ["supplierPhoneNumber", "raw"]),
+                vat_number=extract(invoice, ["supplierVat", "raw"]),
+                website=extract(invoice, ["supplierWebsite", "raw"]),
             )
             payment_information = FinancialPaymentInformation(
                 amount_paid=convert_string_to_number(
-                    invoice.get("paymentAmountPaid", {}).get("parsed"), float
+                    extract(invoice, ["paymentAmountPaid", "parsed"]), float
                 ),
                 total_tax=convert_string_to_number(
-                    invoice.get("paymentAmountTax", {}).get("parsed"), float
+                    extract(invoice, ["paymentAmountTax", "parsed"]), float
                 ),
                 total=convert_string_to_number(
-                    invoice.get("paymentAmountTotal", {}).get("parsed"), float
+                    extract(invoice, ["paymentAmountTotal", "parsed"]), float
                 ),
                 amount_due=convert_string_to_number(
-                    invoice.get("paymentAmountDue", {}).get("parsed"), float
+                    extract(invoice, ["paymentAmountDue", "parsed"]), float
                 ),
-                payment_terms=invoice.get("paymentTerms", {}).get("raw"),
-                transaction_reference=invoice.get("paymentReference", {}).get("raw"),
+                payment_terms=extract(invoice, ["paymentTerms", "raw"]),
+                transaction_reference=extract(invoice, ["paymentReference", "raw"]),
                 amount_shipping=convert_string_to_number(
-                    invoice.get("paymentDelivery", {}).get("parsed"), float
+                    extract(invoice, ["paymentDelivery", "parsed"]), float
                 ),
                 subtotal=convert_string_to_number(
-                    invoice.get("paymentAmountBase", {}).get("parsed"), float
+                    extract(invoice, ["paymentAmountBase", "parsed"]), float
                 ),
-                previous_unpaid_balance=invoice.get("openingBalance", {}).get("parsed"),
+                previous_unpaid_balance=extract(invoice, ["openingBalance", "parsed"]),
             )
             financial_document_information = FinancialDocumentInformation(
-                invoice_receipt_id=invoice.get("invoiceNumber", {}).get("raw")
-                or invoice.get("receiptNumber", {}).get("raw"),
-                order_date=invoice.get("invoiceOrderDate", {}).get("raw"),
-                purchase_order=invoice.get("invoicePurchaseOrderNumber", {}).get("raw"),
-                invoice_due_date=invoice.get("paymentDateDue", {}).get("raw"),
-                invoice_date=invoice.get("invoiceDate", {}).get("raw")
-                or invoice.get("date", {}).get("raw"),
-                biller_code=invoice.get("bpayBillerCode", {}).get("raw"),
-                time=invoice.get("time", {}).get("raw"),
+                invoice_receipt_id=extract(
+                    invoice,
+                    ["invoiceNumber", "raw"],
+                    fallback=extract(invoice, ["receiptNumber", "raw"]),
+                ),
+                order_date=extract(invoice, ["invoiceNumber", "raw"]),
+                purchase_order=extract(invoice, ["invoicePurchaseOrderNumber", "raw"]),
+                invoice_due_date=extract(invoice, ["paymentDateDue", "raw"]),
+                invoice_date=extract(
+                    invoice,
+                    ["invoiceDate", "raw"],
+                    fallback=extract(invoice, ["date", "raw"]),
+                ),
+                biller_code=extract(invoice, ["bpayBillerCode", "raw"]),
+                time=extract(invoice, ["time", "raw"]),
             )
             bank = FinancialBankInformation(
-                account_number=invoice.get("bankAccountNumber", {}).get("raw"),
-                bsb=invoice.get("bankBsb", {}).get("raw"),
-                iban=invoice.get("bankIban", {}).get("raw"),
-                swift=invoice.get("bankSwift", {}).get("raw"),
-                sort_code=invoice.get("bankSortCode", {}).get("raw"),
+                account_number=extract(invoice, ["bankAccountNumber", "raw"]),
+                bsb=extract(invoice, ["bankBsb", "raw"]),
+                iban=extract(invoice, ["bankIban", "raw"]),
+                swift=extract(invoice, ["bankSwift", "raw"]),
+                sort_code=extract(invoice, ["bankSortCode", "raw"]),
             )
             local = FinancialLocalInformation(
-                currency_code=invoice.get("currencyCode", {})
-                .get("parsed", {})
-                .get("value")
-                or invoice.get("receiptCurrencyCode", {}).get("parsed", {}).get("value")
+                currency_code=extract(
+                    invoice,
+                    ["currencyCode", "parsed", "value"],
+                    fallback=extract(
+                        invoice, ["receiptCurrencyCode", "parsed", "value"]
+                    ),
+                ),
             )
             document_metadata = FinancialDocumentMetadata(
                 document_page_number=page_idx + 1

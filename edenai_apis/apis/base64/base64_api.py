@@ -3,16 +3,22 @@ import json
 import mimetypes
 import uuid
 from enum import Enum
-from typing import Any, Dict, Sequence, Type, TypeVar, Union
 from io import BytesIO
+from typing import Any, Dict, Sequence, Type, TypeVar, Union
 
 import requests
 
-from edenai_apis.features import ProviderInterface, OcrInterface
+from edenai_apis.apis.base64.base64_helpers import (
+    extract_item_lignes,
+    format_financial_document_data,
+    format_invoice_document_data,
+    format_receipt_document_data,
+)
+from edenai_apis.features import OcrInterface, ProviderInterface
 from edenai_apis.features.image.face_compare import (
+    FaceCompareBoundingBox,
     FaceCompareDataClass,
     FaceMatch,
-    FaceCompareBoundingBox,
 )
 from edenai_apis.features.ocr.anonymization_async.anonymization_async_dataclass import (
     AnonymizationAsyncDataClass,
@@ -28,13 +34,15 @@ from edenai_apis.features.ocr.data_extraction.data_extraction_dataclass import (
     DataExtractionDataClass,
     ItemDataExtraction,
 )
-from edenai_apis.features.ocr.financial_parser.financial_parser_dataclass import FinancialParserDataClass
+from edenai_apis.features.ocr.financial_parser.financial_parser_dataclass import (
+    FinancialParserDataClass,
+)
 from edenai_apis.features.ocr.identity_parser import (
     IdentityParserDataClass,
     InfoCountry,
+    InfosIdentityParserDataClass,
     ItemIdentityParserDataClass,
     get_info_country,
-    InfosIdentityParserDataClass,
 )
 from edenai_apis.features.ocr.identity_parser.identity_parser_dataclass import (
     Country,
@@ -46,22 +54,16 @@ from edenai_apis.features.ocr.receipt_parser import ReceiptParserDataClass
 from edenai_apis.loaders.data_loader import ProviderDataEnum
 from edenai_apis.loaders.loaders import load_provider
 from edenai_apis.utils.bounding_box import BoundingBox
-from apis.amazon.helpers import check_webhook_result
 from edenai_apis.utils.exception import ProviderException
 from edenai_apis.utils.types import (
     AsyncBaseResponseType,
     AsyncLaunchJobResponseType,
-    ResponseType,
     AsyncPendingResponseType,
     AsyncResponseType,
+    ResponseType,
 )
-from edenai_apis.utils.upload_s3 import upload_file_bytes_to_s3, USER_PROCESS
-from edenai_apis.apis.base64.base64_helpers import (
-    extract_item_lignes,
-    format_invoice_document_data,
-    format_receipt_document_data,
-    format_financial_document_data
-    )
+from edenai_apis.utils.upload_s3 import USER_PROCESS, upload_file_bytes_to_s3
+
 
 class SubfeatureParser(Enum):
     RECEIPT = "receipt"
@@ -80,8 +82,6 @@ class Base64Api(ProviderInterface, OcrInterface):
         )
         self.api_key = self.api_settings["secret"]
         self.url = "https://base64.ai/api/scan"
-        self.webhook_settings = load_provider(ProviderDataEnum.KEY, "webhooksite")
-        self.webhook_token = self.webhook_settings.get("webhook_token")
 
     class Field:
         def __init__(self, document: dict) -> None:
@@ -91,8 +91,6 @@ class Base64Api(ProviderInterface, OcrInterface):
             return self.document.get("fields", {}).get(key, {}).get("value")
 
     def _get_response(self, response: requests.Response) -> Any:
-        print(response.text)
-        print(response.status_code)
         try:
             original_response = response.json()
             if response.status_code >= 400:
@@ -103,12 +101,11 @@ class Base64Api(ProviderInterface, OcrInterface):
             raise ProviderException(response.text, code=response.status_code)
 
     def _send_ocr_document(self, file: str, model_type: str) -> Dict:
-        file_ = open(file, "rb")
-        image_as_base64 = (
-            f"data:{mimetypes.guess_type(file)[0]};base64,"
-            + base64.b64encode(file_.read()).decode()
-        )
-        file_.close()
+        with open(file, "rb") as file_:
+            image_as_base64 = (
+                f"data:{mimetypes.guess_type(file)[0]};base64,"
+                + base64.b64encode(file_.read()).decode()
+            )
 
         data = {"modelTypes": [model_type], "image": image_as_base64}
 
@@ -128,13 +125,9 @@ class Base64Api(ProviderInterface, OcrInterface):
             ocr_file, "finance/" + document_type.value
         )
         if document_type == SubfeatureParser.RECEIPT:
-            standardized_response = format_receipt_document_data(
-                original_response
-            )
+            standardized_response = format_receipt_document_data(original_response)
         elif document_type == SubfeatureParser.INVOICE:
-            standardized_response = format_invoice_document_data(
-                original_response
-            )
+            standardized_response = format_invoice_document_data(original_response)
 
         result = ResponseType[T](
             original_response=original_response,
@@ -143,10 +136,7 @@ class Base64Api(ProviderInterface, OcrInterface):
         return result
 
     def ocr__ocr(
-        self,
-        file: str,
-        language: str,
-        file_url: str = "",
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[OcrDataClass]:
         raise ProviderException(
             message="This provider is deprecated. You won't be charged for your call.",
@@ -154,45 +144,49 @@ class Base64Api(ProviderInterface, OcrInterface):
         )
 
     def ocr__invoice_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[InvoiceParserDataClass]:
         return self._ocr_finance_document(file, SubfeatureParser.INVOICE)
 
     def ocr__receipt_parser(
-        self, file: str, language: str, file_url: str = ""
+        self, file: str, language: str, file_url: str = "", **kwargs
     ) -> ResponseType[ReceiptParserDataClass]:
         return self._ocr_finance_document(file, SubfeatureParser.RECEIPT)
 
     def ocr__financial_parser(
-            self, file: str, language: str, document_type: str = "", file_url: str = ""
-            ) -> ResponseType[FinancialParserDataClass]:
-        original_response = self._send_ocr_document(
-            file, "finance/" + document_type
-        )
+        self,
+        file: str,
+        language: str,
+        document_type: str = "",
+        file_url: str = "",
+        model: str = None,
+        **kwargs,
+    ) -> ResponseType[FinancialParserDataClass]:
+        original_response = self._send_ocr_document(file, "finance/" + document_type)
 
         standardized_response = format_financial_document_data(original_response)
         return ResponseType[FinancialParserDataClass](
             original_response=original_response,
             standardized_response=standardized_response,
         )
-    
+
     def ocr__identity_parser(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", model: str = None, **kwargs
     ) -> ResponseType[IdentityParserDataClass]:
-        file_ = open(file, "rb")
+        with open(file, "rb") as file_:
+            image_as_base64 = (
+                f"data:{mimetypes.guess_type(file)[0]};base64,"
+                + base64.b64encode(file_.read()).decode()
+            )
 
-        image_as_base64 = (
-            f"data:{mimetypes.guess_type(file)[0]};base64,"
-            + base64.b64encode(file_.read()).decode()
-        )
+            payload = json.dumps({"image": image_as_base64})
 
-        payload = json.dumps({"image": image_as_base64})
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": self.api_key,
+            }
 
-        headers = {"Content-Type": "application/json", "Authorization": self.api_key}
-
-        response = requests.post(url=self.url, headers=headers, data=payload)
-
-        file_.close()
+            response = requests.post(url=self.url, headers=headers, data=payload)
 
         original_response = self._get_response(response)
 
@@ -325,11 +319,7 @@ class Base64Api(ProviderInterface, OcrInterface):
         )
 
     def image__face_compare(
-        self,
-        file1: str,
-        file2: str,
-        file1_url: str = "",
-        file2_url: str = "",
+        self, file1: str, file2: str, file1_url: str = "", file2_url: str = "", **kwargs
     ) -> ResponseType[FaceCompareDataClass]:
         url = "https://base64.ai/api/face"
 
@@ -338,22 +328,22 @@ class Base64Api(ProviderInterface, OcrInterface):
         if file1_url and file2_url:
             payload = json.dumps({"url": file1_url, "queryUrl": file2_url})
         else:
-            file_reference_ = open(file1, "rb")
-            file_query_ = open(file2, "rb")
-            image_reference_as_base64 = (
-                f"data:{mimetypes.guess_type(file1)[0]};base64,"
-                + base64.b64encode(file_reference_.read()).decode()
-            )
-            image_query_as_base64 = (
-                f"data:{mimetypes.guess_type(file2)[0]};base64,"
-                + base64.b64encode(file_query_.read()).decode()
-            )
-            payload = json.dumps(
-                {
-                    "document": image_reference_as_base64,
-                    "query": image_query_as_base64,
-                }
-            )
+            with open(file1, "rb") as file_reference_, open(file2, "rb") as file_query_:
+
+                image_reference_as_base64 = (
+                    f"data:{mimetypes.guess_type(file1)[0]};base64,"
+                    + base64.b64encode(file_reference_.read()).decode()
+                )
+                image_query_as_base64 = (
+                    f"data:{mimetypes.guess_type(file2)[0]};base64,"
+                    + base64.b64encode(file_query_.read()).decode()
+                )
+                payload = json.dumps(
+                    {
+                        "document": image_reference_as_base64,
+                        "query": image_query_as_base64,
+                    }
+                )
 
         response = requests.request("POST", url, headers=headers, data=payload)
         original_response = self._get_response(response)
@@ -379,7 +369,7 @@ class Base64Api(ProviderInterface, OcrInterface):
         )
 
     def ocr__data_extraction(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[DataExtractionDataClass]:
         with open(file, "rb") as f_stream:
             image_as_base64 = (
@@ -408,14 +398,15 @@ class Base64Api(ProviderInterface, OcrInterface):
                 except ValueError:
                     bbox = BoundingBox.unknown()
 
-                items.append(
-                    ItemDataExtraction(
-                        key=value.get("key"),
-                        value=value.get("value"),
-                        confidence_score=value.get("confidence"),
-                        bounding_box=bbox,
+                if key := value.get("key"):
+                    items.append(
+                        ItemDataExtraction(
+                            key=key,
+                            value=value.get("value"),
+                            confidence_score=value.get("confidence"),
+                            bounding_box=bbox,
+                        )
                     )
-                )
 
         standardized_response = DataExtractionDataClass(fields=items)
 
@@ -425,7 +416,7 @@ class Base64Api(ProviderInterface, OcrInterface):
         )
 
     def ocr__bank_check_parsing(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> ResponseType[BankCheckParsingDataClass]:
         with open(file, "rb") as fstream:
             image_as_base64 = (
@@ -473,15 +464,15 @@ class Base64Api(ProviderInterface, OcrInterface):
             )
 
     def ocr__anonymization_async__launch_job(
-        self, file: str, file_url: str = ""
+        self, file: str, file_url: str = "", **kwargs
     ) -> AsyncLaunchJobResponseType:
         data_job_id = {}
-        file_ = open(file, "rb")
-        image_as_base64 = (
-            f"data:{mimetypes.guess_type(file)[0]};base64,"
-            + base64.b64encode(file_.read()).decode()
-        )
-        file_.close()
+        with open(file, "rb") as file_:
+            image_as_base64 = (
+                f"data:{mimetypes.guess_type(file)[0]};base64,"
+                + base64.b64encode(file_.read()).decode()
+            )
+
         payload = json.dumps(
             {
                 "image": image_as_base64,
@@ -515,51 +506,6 @@ class Base64Api(ProviderInterface, OcrInterface):
         original_response = self._get_response(response)
 
         job_id = "document_anonymization_base64" + str(uuid.uuid4())
-        data_job_id[job_id] = original_response
-        requests.post(
-            url=f"https://webhook.site/{self.webhook_token}",
-            data=json.dumps(data_job_id),
-            headers={"content-type": "application/json"},
-        )
-
-        return AsyncLaunchJobResponseType(provider_job_id=job_id)
-
-    def ocr__anonymization_async__get_job_result(
-        self, provider_job_id: str
-    ) -> AsyncBaseResponseType[AnonymizationAsyncDataClass]:
-        wehbook_result, response_status = check_webhook_result(
-            provider_job_id, self.webhook_settings
-        )
-
-        if response_status != 200:
-            raise ProviderException(wehbook_result, code=response_status)
-
-        result_object = (
-            next(
-                filter(
-                    lambda response: provider_job_id in response["content"],
-                    wehbook_result,
-                ),
-                None,
-            )
-            if wehbook_result
-            else None
-        )
-
-        if not result_object or not result_object.get("content"):
-            raise ProviderException("Provider returned an empty response")
-
-        try:
-            original_response = json.loads(result_object["content"]).get(
-                provider_job_id, None
-            )
-        except json.JSONDecodeError:
-            raise ProviderException("An error occurred while parsing the response.")
-
-        if original_response is None:
-            return AsyncPendingResponseType[AnonymizationAsyncDataClass](
-                provider_job_id=provider_job_id
-            )
         # Extract the B64 redacted document
         redacted_document = original_response[0].get("redactedDocument")
         # document_mimetype = original_response[0]['features']['properties']['mimeType']
@@ -579,5 +525,5 @@ class Base64Api(ProviderInterface, OcrInterface):
             standardized_response=AnonymizationAsyncDataClass(
                 document=base64_data, document_url=resource_url
             ),
-            provider_job_id=provider_job_id,
+            provider_job_id=job_id,
         )

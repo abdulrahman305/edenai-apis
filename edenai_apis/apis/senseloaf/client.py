@@ -120,9 +120,9 @@ class Client:
             try:
                 message = json.loads(exc.response.text)
                 if message.get("errorCode") == "AUTHENTICATION_FAILED":
-                    message[
-                        "errorMessage"
-                    ] = "Authentication Failed. Please check your EmailID/Password Combination or API Key"
+                    message["errorMessage"] = (
+                        "Authentication Failed. Please check your EmailID/Password Combination or API Key"
+                    )
                     message["response"]["error"]["faultDetail"] = [
                         "Authentication Failed. Please check your EmailID/Password Combination or API Key"
                     ]
@@ -161,23 +161,24 @@ class Client:
 
     def __parse_resume_from_file(self, file: str) -> ResponseData:
         url = f"{self.BASE_URL}/api/v2/parse-resume"
-        files = [
-            (
-                "files",
-                (file.split("/")[-1], open(file, "rb"), mimetypes.guess_type(file)[0]),
+        with open(file, "rb") as file_:
+            files = [
+                (
+                    "files",
+                    (file.split("/")[-1], file_, mimetypes.guess_type(file)[0]),
+                )
+            ]
+            headers = {"Authorization": f"Bearer {self.__api_key}"}
+            response = self.__request(
+                method=HTTPMethod.POST,
+                url=url,
+                data=None,
+                headers=headers,
+                json_field=None,
+                files=files,
+                params=None,
+                return_type="json",
             )
-        ]
-        headers = {"Authorization": f"Bearer {self.__api_key}"}
-        response = self.__request(
-            method=HTTPMethod.POST,
-            url=url,
-            data=None,
-            headers=headers,
-            json_field=None,
-            files=files,
-            params=None,
-            return_type="json",
-        )
         if response.response_code != "200":
             raise ProviderException(
                 message=response.response, code=response.response_code
@@ -260,10 +261,6 @@ class Client:
             raise ProviderException(
                 "Please provide path to file or url for parsing resume"
             )
-        elif file != "" and url != "":
-            raise ProviderException(
-                "Please provide file or url for parsing resume, not both"
-            )
         elif file != "":
             return self.__parse_resume_from_file(file)
         elif url != "":
@@ -273,10 +270,6 @@ class Client:
         if file == "" and url == "":
             raise ProviderException(
                 "Please provide path to file or url for parsing resume"
-            )
-        elif file != "" and url != "":
-            raise ProviderException(
-                "Please provide file or url for parsing resume, not both"
             )
         elif file != "":
             return self.__parse_jd_from_file(file)

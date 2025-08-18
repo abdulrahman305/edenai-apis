@@ -9,14 +9,15 @@ from edenai_apis import interface_v2
 from edenai_apis.features.provider.provider_interface import ProviderInterface
 from edenai_apis.loaders.data_loader import FeatureDataEnum, ProviderDataEnum
 from edenai_apis.loaders.loaders import load_feature, load_provider
+from edenai_apis.loaders.data_loader import load_info_file
 from edenai_apis.utils.constraints import validate_all_provider_constraints
 from edenai_apis.utils.exception import ProviderException, get_appropriate_error
-from edenai_apis.utils.monitoring import insert_api_call, monitor_call
 from edenai_apis.utils.types import AsyncLaunchJobResponseType
 from dotenv import load_dotenv
+from pydantic import BaseModel
+import asyncio
 
 load_dotenv()
-IS_MONITORING = os.environ.get("MONITORING") is not None  # see utils.monitoring
 
 ProviderDict = Dict[
     str, Dict[str, Dict[str, Union[Dict[str, Literal[True]], Literal[True]]]]
@@ -31,8 +32,7 @@ def list_features(
     feature: Optional[str] = None,
     subfeature: Optional[str] = None,
     as_dict: Literal[False] = False,
-) -> ProviderList:
-    ...
+) -> ProviderList: ...
 
 
 @overload
@@ -41,8 +41,7 @@ def list_features(
     feature: Optional[str] = None,
     subfeature: Optional[str] = None,
     as_dict: Literal[True] = True,
-) -> ProviderDict:
-    ...
+) -> ProviderDict: ...
 
 
 def list_features(
@@ -169,10 +168,24 @@ def list_providers(
     return list(providers_set)
 
 
+def provider_info(provider_name: str):
+    """
+    Get provider info
+
+    Args:
+        provider_name (str): Eden AI provider name
+
+    Returns:
+        dict: Provider info
+    """
+    if provider_name is None:
+        return {}
+    return load_info_file(provider_name)
+
+
 STATUS_SUCCESS = "success"
 
 
-@monitor_call(condition=IS_MONITORING)
 def compute_output(
     provider_name: str,
     feature: str,
@@ -182,6 +195,7 @@ def compute_output(
     fake: bool = False,
     api_keys: Dict = {},
     user_email: Optional[str] = None,
+    **kwargs,
 ) -> Dict:
     """
     Compute subfeature for provider and subfeature
@@ -194,7 +208,7 @@ def compute_output(
         args (Dict): inputs arguments for the feature call
         fake (bool, optional): take result from sample. Defaults to `False`.
         api_keys (dict, optional): optional user's api_keys for each providers
-        user_email (str, optional): optinal user email for monitoring (opted-out by default)
+        user_email (str, optional): optional user email for monitoring (opted-out by default)
 
     Returns:
         dict: Result dict
@@ -213,17 +227,17 @@ def compute_output(
         time.sleep(
             random.uniform(0.5, 1.5)
         )  # sleep to fake the response time from a provider
-        sample_args = load_feature(
-            FeatureDataEnum.SAMPLES_ARGS,
-            feature=feature,
-            subfeature=subfeature,
-            phase=phase,
-            provider_name=provider_name,
-        )
+        # sample_args = load_feature(
+        #     FeatureDataEnum.SAMPLES_ARGS,
+        #     feature=feature,
+        #     subfeature=subfeature,
+        #     phase=phase,
+        #     provider_name=provider_name,
+        # )
         # replace File Wrapper by file and file_url inputs and also transform input attributes as settings for tts
-        sample_args = validate_all_provider_constraints(
-            provider_name, feature, subfeature, phase, sample_args
-        )
+        # sample_args = validate_all_provider_constraints(
+        #     provider_name, feature, subfeature, phase, sample_args
+        # )
 
         # Return mocked results
         if is_async:
@@ -244,14 +258,13 @@ def compute_output(
 
     else:
         # Fake == False : Compute real output
-
         feature_class = getattr(interface_v2, feature.title())
         subfeature_method_name = f'{subfeature}{f"__{phase}" if phase else ""}{suffix}'
         subfeature_class = getattr(feature_class, subfeature_method_name)
 
         try:
             subfeature_result = subfeature_class(provider_name, api_keys)(
-                **args
+                **args, **kwargs
             ).model_dump()
         except ProviderException as exc:
             raise get_appropriate_error(provider_name, exc)
@@ -262,15 +275,88 @@ def compute_output(
         **subfeature_result,
     }
 
-    if os.environ.get("MONITORING", False) is True and user_email:
-        error = "Fake" if fake else None
-        insert_api_call(
-            provider=provider_name,
+    return final_result
+
+
+async def acompute_output(
+    provider_name: str,
+    feature: str,
+    subfeature: str,
+    args: Dict[str, Any],
+    fake: bool = False,
+    api_keys: Dict = {},
+    **kwargs,
+) -> Dict:
+    """
+    Compute subfeature for provider and subfeature
+
+    Args:
+        provider_name (str): EdenAI provider name
+        feature (str): EdenAI feature name
+        subfeature (str): EdenAI subfeature name
+        args (Dict): inputs arguments for the feature call
+        fake (bool, optional): take result from sample. Defaults to `False`.
+        api_keys (dict, optional): optional user's api_keys for each providers
+
+    Returns:
+        Union[Dict,AsyncGenerator]:
+            - If the keyword argument `stream=True` is passed, returns an async generator that yields
+            chunks of the streaming response asynchronously.
+            - Otherwise, returns a dictionary containing the full result synchronously.
+    """
+    if fake and kwargs.get("stream", False):
+        raise ValueError(
+            "Asynchronous calls with fake data are not supported for streaming responses."
+        )
+    phase = ""
+    if feature not in ("llm") and subfeature not in ("achat"):
+        raise ValueError(
+            "Asynchronous calls are only supported for LLM chat subfeature at the moment."
+        )
+
+    args = validate_all_provider_constraints(
+        provider_name, feature, subfeature, phase, args
+    )
+
+    if fake:
+        await asyncio.sleep(random.uniform(0.5, 1.5))
+
+        subfeature_result = load_provider(
+            ProviderDataEnum.OUTPUT,
+            provider_name=provider_name,
             feature=feature,
             subfeature=subfeature,
-            user_email=user_email,
-            error=error,
+            phase=phase,
         )
+
+    else:
+        ProviderClass = load_provider(
+            ProviderDataEnum.CLASS, provider_name=provider_name
+        )
+        provider_instance = ProviderClass(api_keys)
+        func_name = f'{feature}__a{subfeature}{f"__{phase}" if phase else ""}'
+        subfeature_func = getattr(provider_instance, func_name)
+
+        try:
+            subfeature_result = await subfeature_func(**args, **kwargs)
+            subfeature_result = subfeature_result.model_dump()
+        except ProviderException as exc:
+            raise get_appropriate_error(provider_name, exc)
+
+    if kwargs.get("stream", False):
+
+        async def generate_chunks():
+            async for chunk in subfeature_result["stream"]:
+                if chunk is not None:
+                    yield chunk.model_dump()
+
+        return generate_chunks()
+
+    final_result: Dict[str, Any] = {
+        "status": STATUS_SUCCESS,
+        "provider": provider_name,
+        **subfeature_result,
+    }
 
     return final_result
 
@@ -345,12 +431,11 @@ def check_provider_constraints(
     return True, "All Good!"
 
 
-@monitor_call(condition=IS_MONITORING)
 def get_async_job_result(
     provider_name: str,
     feature: str,
     subfeature: str,
-    async_job_id: AsyncLaunchJobResponseType,
+    async_job_id: str,
     phase: str = "",
     fake: bool = False,
     user_email=None,

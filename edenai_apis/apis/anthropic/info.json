@@ -1,12 +1,11 @@
 {
+  "_metadata": {
+    "privacy_url": "https://www.anthropic.com/legal/privacy"
+  },
   "text": {
     "generation": {
       "constraints": {
-        "models": [
-          "claude-instant-v1",
-          "claude-v1",
-          "claude-v2"
-        ],
+        "models": ["claude-instant-v1", "claude-v1", "claude-v2"],
         "default_model": "claude-v2"
       },
       "version": "bedrock-2023-05-31"
@@ -41,6 +40,24 @@
   "multimodal": {
     "chat": {
       "version": "bedrock-2023-05-31"
+    }
+  },
+  "image": {
+    "logo_detection": {
+      "version": "bedrock-2023-05-31"
+    }
+  },
+  "llm": {
+    "chat": {
+      "models": [
+        "claude-3-5-haiku-latest",
+        "claude-3-5-sonnet-latest",
+        "claude-3-7-sonnet-20250219"
+      ],
+      "version": "v1"
+    },
+    "achat": {
+      "version": "llmengine (v2)"
     }
   }
 }

@@ -21,21 +21,14 @@
     "summarize": {
       "version": "2022-12-06",
       "constraints": {
-        "languages": [
-          "en"
-        ],
-        "models": [
-          "summarize-xlarge",
-          "summarize-medium"
-        ],
+        "languages": ["en"],
+        "models": ["summarize-xlarge", "summarize-medium"],
         "default_model": "summarize-xlarge"
       }
     },
     "spell_check": {
       "constraints": {
-        "languages": [
-          "en"
-        ],
+        "languages": ["en"],
         "allow_null_language": false
       },
       "version": "2022-12-06"
@@ -66,5 +59,16 @@
       },
       "version": "2022-12-06"
     }
+  },
+  "llm": {
+    "chat": {
+      "version": "llmengine (v2)"
+    },
+    "achat": {
+      "version": "llmengine (v2)"
+    }
+  },
+  "_metadata": {
+    "privacy_url": "https://cohere.com/privacy"
   }
 }

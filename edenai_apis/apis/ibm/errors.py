@@ -1,13 +1,13 @@
 from edenai_apis.utils.exception import (
     ProviderErrorLists,
     ProviderInternalServerError,
+    ProviderInvalidInputAudioEncodingError,
     ProviderInvalidInputError,
+    ProviderInvalidInputFileFormatError,
     ProviderInvalidInputPayloadSize,
     ProviderMissingInputError,
-    ProviderParsingError,
-    ProviderInvalidInputFileFormatError,
-    ProviderInvalidInputAudioEncodingError,
     ProviderNotFoundError,
+    ProviderParsingError,
 )
 
 # NOTE: error messages should be regex patterns

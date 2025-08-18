@@ -16,12 +16,10 @@ from edenai_apis.utils.constraints import (
     validate_all_provider_constraints,
 )
 from edenai_apis.utils.types import AsyncLaunchJobResponseType
-from edenai_apis.interface import IS_MONITORING
-from edenai_apis.utils.monitoring import insert_api_call
 
 # TEXT_AUTOML_CLASSIFICATION = ["training_async", "prediction_async"]
 
-MAX_TIME = 220
+MAX_TIME = 280
 TIME_BETWEEN_CHECK = 10
 
 
@@ -59,9 +57,7 @@ def test_outputs(provider, feature, subfeature, phase, generate=True):
     )
     print("------------------------------------------------------------")
     args = validate_all_provider_constraints(provider, feature, subfeature, phase, args)
-
-    print(args)
-
+    
     if "async" in subfeature or "async" in phase:
         # Subfeature is asyncronous
 
@@ -128,12 +124,4 @@ def test_outputs(provider, feature, subfeature, phase, generate=True):
                         )
                     )
 
-    if IS_MONITORING:
-        insert_api_call(
-            provider=provider,
-            feature=feature,
-            subfeature=subfeature,
-            user_email=None,
-            error=None,
-        )
     return api_output

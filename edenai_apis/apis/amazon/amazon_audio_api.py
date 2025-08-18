@@ -1,18 +1,20 @@
+import base64
 import json
 import urllib
 import uuid
-import base64
-import requests
 from io import BufferedReader, BytesIO
-from botocore.exceptions import BotoCoreError, ClientError
 from pathlib import Path
 from typing import Optional
+
+import requests
+from botocore.exceptions import BotoCoreError, ClientError
 
 from edenai_apis.apis.amazon.helpers import (
     generate_right_ssml_text,
     get_right_audio_support_and_sampling_rate,
     handle_amazon_call,
 )
+from edenai_apis.features.audio import TextToSpeechAsyncDataClass
 from edenai_apis.features.audio.audio_interface import AudioInterface
 from edenai_apis.features.audio.speech_to_text_async.speech_to_text_async_dataclass import (
     SpeechDiarization,
@@ -22,9 +24,9 @@ from edenai_apis.features.audio.speech_to_text_async.speech_to_text_async_datacl
 from edenai_apis.features.audio.text_to_speech.text_to_speech_dataclass import (
     TextToSpeechDataClass,
 )
-from edenai_apis.utils.exception import (
-    ProviderException,
-)
+from edenai_apis.loaders.data_loader import ProviderDataEnum
+from edenai_apis.loaders.loaders import load_provider
+from edenai_apis.utils.exception import ProviderException
 from edenai_apis.utils.ssml import is_ssml
 from edenai_apis.utils.types import (
     AsyncBaseResponseType,
@@ -34,18 +36,15 @@ from edenai_apis.utils.types import (
     ResponseType,
 )
 from edenai_apis.utils.upload_s3 import (
-    upload_file_bytes_to_s3,
-    USER_PROCESS,
-    get_s3_file_url,
     URL_LONG_PERIOD,
+    USER_PROCESS,
     get_cloud_front_file_url,
+    get_s3_file_url,
     s3_client_load,
+    upload_file_bytes_to_s3,
 )
 
 from .config import audio_voices_ids, storage_clients
-from edenai_apis.features.audio import TextToSpeechAsyncDataClass
-from edenai_apis.loaders.data_loader import ProviderDataEnum
-from edenai_apis.loaders.loaders import load_provider
 
 
 class AmazonAudioApi(AudioInterface):
@@ -60,6 +59,7 @@ class AmazonAudioApi(AudioInterface):
         speaking_pitch: int,
         speaking_volume: int,
         sampling_rate: int,
+        **kwargs,
     ) -> ResponseType[TextToSpeechDataClass]:
         _, voice_id_name, engine = voice_id.split("_")
         engine = engine.lower()
@@ -194,6 +194,7 @@ class AmazonAudioApi(AudioInterface):
         model: Optional[str] = None,
         file_url: str = "",
         provider_params: Optional[dict] = None,
+        **kwargs,
     ) -> AsyncLaunchJobResponseType:
         provider_params = provider_params or {}
         export_format, channels, frame_rate = audio_attributes
@@ -223,7 +224,12 @@ class AmazonAudioApi(AudioInterface):
             )
 
         self._launch_transcribe(
-            filename, frame_rate, language, speakers, format=export_format
+            filename,
+            frame_rate,
+            language,
+            speakers,
+            format=export_format,
+            provider_params=provider_params,
         )
         return AsyncLaunchJobResponseType(provider_job_id=filename)
 
@@ -293,6 +299,8 @@ class AmazonAudioApi(AudioInterface):
             ]
             with urllib.request.urlopen(json_res) as url:
                 original_response = json.loads(url.read().decode("utf-8"))
+                # add metadata to the response (settings, result/subtitle urls etc.)
+                original_response.update(job_details)
                 # diarization
                 diarization_entries = []
                 words_info = original_response["results"]["items"]
@@ -361,6 +369,7 @@ class AmazonAudioApi(AudioInterface):
         speaking_volume: int,
         sampling_rate: int,
         file_url: str = "",
+        **kwargs,
     ) -> AsyncLaunchJobResponseType:
         _, voice_id_name, engine = voice_id.split("_")
         engine = engine.lower()
@@ -429,7 +438,6 @@ class AmazonAudioApi(AudioInterface):
             )
             synthesis_task["OutputUri"] = file_url
             response_file = requests.get(file_url)
-            print(response_file.content)
             audio_content = BytesIO(response_file.content)
             audio = base64.b64encode(audio_content.read()).decode("utf-8")
             standardized_response = TextToSpeechAsyncDataClass(
